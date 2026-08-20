@@ -44,13 +44,15 @@ build/
 Build/
 build-*/
 
-# CMake generated files
+# CMake generated files (out-of-source build, so no Makefile lands at root)
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
 install_manifest.txt
 compile_commands.json
+
+# built binary (placed at repo root, see CMakeLists.txt)
+/benchmark
 
 # Temporary files
 *.tmp
@@ -74,3 +76,5 @@ graphify-out
 .DS_Store
 
 data/
+
+venv

@@ -64,3 +64,4 @@ std::array<uint8_t, TUPLE_SIZE> parseLineToTuple(const std::string& line) {
 
     return key;
 }
+
