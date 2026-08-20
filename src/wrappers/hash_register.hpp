@@ -23,4 +23,6 @@ typedef struct
    RssHashFunction fn;
 }hash_algoritm;
 
+extern const std::array<hash_algoritm, 5> hash_functions_arr;
+
  #endif //HASH_REGISTER_HPP

@@ -1,0 +1,33 @@
+CXX := g++
+CXXFLAGS := -std=c++17 -Wall -Wextra -O3
+
+BUILD_DIR := build
+TARGET := benchmark
+
+# external/toeplitz is excluded: broken (relies on undefined DPDK symbols)
+# and not yet referenced by any wrapper.
+SRCS := $(wildcard src/*.cpp) \
+        $(wildcard src/wrappers/*.cpp) \
+        $(wildcard external/chaskey/*.cpp) \
+        $(wildcard external/siphash/*.cpp) \
+        $(wildcard external/spookyhash/*.cpp) \
+        $(wildcard external/ascon/*.cpp)
+
+OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
+
+.PHONY: all run clean
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+run: $(TARGET)
+	./$(TARGET)
+
+clean:
+	rm -rf $(BUILD_DIR) $(TARGET)
