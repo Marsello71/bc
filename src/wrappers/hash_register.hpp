@@ -14,6 +14,8 @@
 #include "siphash_rss.h"
 #include "halfsiphash_rss.h"
 #include "spookyhash_rss.h"
+#include "jhash_rss.h"
+#include "crc32c_rss.h"
 
 using RssHashFunction  = uint32_t (*)(const uint8_t *, size_t, const uint8_t *);
 

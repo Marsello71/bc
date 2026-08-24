@@ -29,14 +29,56 @@ def plot_hash_per_sec_comparison(data : pd.DataFrame, output_path : Path) -> Non
     plt.savefig(output_path)
     plt.close()
 
+def compute_fairness_index(data : pd.DataFrame, channel_cols : list[str]) -> pd.Series :
+    channels = data[channel_cols]
+    sum_x = channels.sum(axis = 1) 
+    sum_x_sq = (channels ** 2).sum(axis=1)
+    n = len(channel_cols)
+    return sum_x ** 2 / (n * sum_x_sq)
+
+def plot_fairness_comparison(data : pd.DataFrame, channel_cols : list[str], output_path : Path) -> None :
+    plt.figure()
+    data["fairness"] = compute_fairness_index(data, channel_cols)
+    data = data.sort_values("fairness")
+    plt.bar(data["algorithm"], data["fairness"])
+    plt.xlabel("algorithm")
+    plt.axhline(1.0, linestyle="--", color="gray")
+    plt.title("Comparison of Hash Fairness Index")
+    plt.ylabel("Jain's Fairness Index")
+    margin = (data["fairness"].max() - data["fairness"].min()) * 0.1
+    plt.ylim(data["fairness"].min() - margin, data["fairness"].max() + margin)
+    plt.savefig(output_path)
+    plt.close()
+
+def compute_min_max (data : pd.DataFrame, channel_cols : list[str]) -> pd.Series :
+    channels = data[channel_cols]
+    sum_x_min= channels.min(axis = 1) 
+    sum_x_max= channels.max(axis = 1)
+    diffrence = sum_x_max - sum_x_min
+    diffrence = diffrence.sort_values()
+    return(diffrence/data["tuple_count"]) * 100
+
+def plot_min_max_comparison(data : pd.DataFrame, channel_cols : list[str], output_path : Path) -> None :
+    plt.figure()
+    data["min_max_diff"] = compute_min_max(data, channel_cols)
+    data = data.sort_values("min_max_diff")
+    plt.bar(data["algorithm"], data["min_max_diff"])
+    plt.xlabel("algorithm")
+    plt.title("Comparison of min max diffrence in %")
+    plt.ylabel("Diffrence ")
+    plt.savefig(output_path)
+    plt.close()
+
 def main() :
     RESULTS_CSV = Path("results/perf_results.csv")
-    OUTPUT_PNG = Path("results/speed_comparison.png")
     data = load_results(RESULTS_CSV)
-    plot_speed_comparison(data, OUTPUT_PNG)
-    print(f"Chart was saved in {OUTPUT_PNG}")
+    channel_cols = [c for c in data.columns if c.startswith("channel_")]
 
+    
+    plot_speed_comparison(data, "results/speed_comparison.png")
     plot_hash_per_sec_comparison(data, Path("results/hash_per_sec_comparison.png"))
+    plot_fairness_comparison(data,channel_cols, Path("results/fairness_comparison.png"))
+    plot_min_max_comparison(data,channel_cols, Path("results/min_max_diff_comparison.png"))
 
 if __name__ == "__main__":
     main()

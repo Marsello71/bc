@@ -6,4 +6,4 @@ make clean
 
 echo "running python program"
 source venv/bin/activate
-python histogram.py
+python analyze.py
