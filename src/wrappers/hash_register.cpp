@@ -2,11 +2,11 @@
 
 
 const std::array<hash_algoritm, 7> hash_functions_arr = {{
-        {"jhash", jhashlittleRssWrapper},
-        {"crc32c", crc32cRssWrapper},
-        {"chaskey", chaskeyRssWrapper},
-        {"halfsiphash", halfSipHashRssWrapper},
-        {"siphash", sipHashRssWrapper},
-        {"spookyhash", spookyhashRssWrapper},
-        {"ascon", asconRssWrapper}
+        {"ascon", asconRssWrapper, false},
+        {"crc32c", crc32cRssWrapper, false},
+        {"jhash", jhashlittleRssWrapper, true},
+        {"chaskey", chaskeyRssWrapper, true},
+        {"halfsiphash", halfSipHashRssWrapper, true},
+        {"siphash", sipHashRssWrapper, true},
+        {"spookyhash", spookyhashRssWrapper, true}
 }};

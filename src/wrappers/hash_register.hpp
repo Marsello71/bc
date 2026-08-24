@@ -23,8 +23,9 @@ typedef struct
 {
    const char *name;
    RssHashFunction fn;
+   bool keyed;
 }hash_algoritm;
 
-extern const std::array<hash_algoritm, 5> hash_functions_arr;
+extern const std::array<hash_algoritm, 7> hash_functions_arr;
 
  #endif //HASH_REGISTER_HPP
