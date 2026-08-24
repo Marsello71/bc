@@ -15,16 +15,28 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <vector>
 
 namespace {
+    constexpr uint32_t KEY_SEED =  65536;
+    constexpr std::size_t NUM_KEYS = 32;
     constexpr std::size_t RSS_KEY_SIZE = 16;
-    // Fixed key so every algorithm is tested under identical conditions and
-    // the run is reproducible.
-    constexpr std::array<uint8_t, RSS_KEY_SIZE> RSS_KEY = {
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
-    };
+}
+
+std::vector<std::array<uint8_t, RSS_KEY_SIZE>> getKeys() { 
+    std::vector<std::array<uint8_t, RSS_KEY_SIZE>>  keys;
+    std::mt19937 generator(KEY_SEED);
+    std::uniform_int_distribution<int> distribution(0, 255);
+
+    for(std::size_t i = 0; i < NUM_KEYS; i++) {
+        std::array<uint8_t, RSS_KEY_SIZE> key;
+        for(std::size_t j = 0; j < RSS_KEY_SIZE; j++) { 
+            key[j] = static_cast<uint8_t>(distribution(generator));
+        }
+        keys.push_back(key);
+    }
+    return keys;
 }
 
 int main() {
@@ -58,35 +70,36 @@ int main() {
 
     std::cout << "Loaded " << tuples.size() << " tuples.\n";
 
-    results << "algorithm,tuple_count,total_time_ns,avg_time_ns";
+    results << "algorithm,tuple_count,total_time_ns,avg_time_ns,key_id";
     for (int c = 0; c < DMA; c++) {
         results << ",channel_" << c;
     }
     results << "\n";
 
+    std::vector<std::array<uint8_t, RSS_KEY_SIZE>> keys = getKeys();
+
     for (const auto &algo : hash_functions_arr) {
-        std::vector<int> histogram(DMA, 0);
 
-        auto start = std::chrono::steady_clock::now();
+        std::size_t key_count = algo.keyed ? NUM_KEYS : 1;
+        for(std::size_t i = 0; i < key_count; i++) {
+            std::vector<int> histogram(DMA, 0);
 
-        for (const auto &tuple : tuples) {
-            uint32_t hash = algo.fn(tuple.data(), tuple.size(), RSS_KEY.data());
-            int channel = static_cast<int>(hash % DMA);
-            histogram[channel]++;
+            auto start = std::chrono::steady_clock::now();
+            for (const auto &tuple : tuples) {
+                uint32_t hash = algo.fn(tuple.data(), tuple.size(), keys[i].data());
+                int channel = static_cast<int>(hash % DMA);
+                histogram[channel]++;
+            }
+            auto end = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+            double avg_ns = static_cast<double>(elapsed.count()) / static_cast<double>(tuples.size());
+            results << algo.name << "," << tuples.size() << "," << elapsed.count() << "," << avg_ns << ",";
+            if (algo.keyed) results << i; else results << "N/A";
+            for (int c = 0; c < DMA; c++) {
+                results << "," << histogram[c];
+            }
+            results << "\n";
         }
-
-        auto end = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
-
-        double avg_ns = static_cast<double>(elapsed.count()) / static_cast<double>(tuples.size());
-
-        results << algo.name << "," << tuples.size() << "," << elapsed.count() << "," << avg_ns;
-        for (int c = 0; c < DMA; c++) {
-            results << "," << histogram[c];
-        }
-        results << "\n";
-
-        std::cout << algo.name << ": " << elapsed.count() << " ns total, " << avg_ns << " ns/hash\n";
     }
 
     return 0;
