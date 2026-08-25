@@ -13,9 +13,6 @@
 #include <string>
 #include <vector>
 
-/// Number of DMA channels (default)
-constexpr int DMA = 8;
-
 /// Size of the generated key in bytes
 constexpr std::size_t TUPLE_SIZE = 37;
 

@@ -39,18 +39,25 @@ std::vector<std::array<uint8_t, RSS_KEY_SIZE>> getKeys() {
     return keys;
 }
 
-int main() {
-    std::ifstream reader("data/output.csv");
-    if (!reader.is_open()) {
-        std::cerr << "Failed to open data/output.csv\n";
+int main(int argc, char* argv[]) {
+    if(argc != 4) {
+        std::cerr << "tu run the analysis main needs 3 argumenst: [dataset] [output_file], [DMA]\n";
         return 1;
     }
 
-    std::ofstream results("results/perf_results.csv");
-    if (!results.is_open()) {
-        std::cerr << "Failed to open results/perf_results.csv for writing\n";
+    std::ifstream reader(argv[1]);
+    if (!reader.is_open()) {
+        std::cerr << "Failed to open file for reading\n";
         return 1;
     }
+
+    std::ofstream results(argv[2]);
+    if (!results.is_open()) {
+        std::cerr << "Failed to open file for writing\n";
+        return 1;
+    }
+
+    const int DMA = std::stoi(argv[3]);
 
     std::vector<std::array<uint8_t, TUPLE_SIZE>> tuples;
     tuples.reserve(5000000);

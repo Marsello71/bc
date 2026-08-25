@@ -29,7 +29,7 @@ $(BUILD_DIR)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 run: $(TARGET)
-	./$(TARGET)
+	./$(TARGET) 
 
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
