@@ -2,11 +2,11 @@
 
 echo "running rss_analyzer.cpp"
 make 
-./benchmark data/output.csv results/FULL/FULL_RUN_results.csv 8
-./benchmark data/sweep_dstip_50k.csv results/PER_FIELD/dstIP/sweep_dstip_results.csv 8
-./benchmark data/sweep_dstport_50k.csv results/PER_FIELD/dstPort/sweep_dstport_results.csv 8
-./benchmark data/sweep_srcip_50k.csv results/PER_FIELD/srcIP/sweep_srcip_results.csv 8
-./benchmark data/sweep_srcport_50k.csv results/PER_FIELD/srcPort/sweep_srcport_results.csv 8
+./benchmark data/output.csv results/FULL/FULL_RUN_results.csv 
+./benchmark data/sweep_dstip_50k.csv results/PER_FIELD/dstIP/sweep_dstip_results.csv 
+./benchmark data/sweep_dstport_50k.csv results/PER_FIELD/dstPort/sweep_dstport_results.csv 
+./benchmark data/sweep_srcip_50k.csv results/PER_FIELD/srcIP/sweep_srcip_results.csv 
+./benchmark data/sweep_srcport_50k.csv results/PER_FIELD/srcPort/sweep_srcport_results.csv 
 make clean
 
 echo "running python program"
