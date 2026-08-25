@@ -2,6 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from pathlib import Path
+import sys
+
 
 def load_results(csv_path : Path) -> pd.DataFrame:
     if not csv_path.exists() : 
@@ -108,22 +110,24 @@ def plot_chi_comparison(data : pd.DataFrame, column : str, output_path : Path) -
     plt.close()
 
 def main() :
-    RESULTS_CSV = Path("results/perf_results.csv")
+    if len(sys.argv) != 3 : 
+        sys.stderr.write("tu run the analysis main needs 3 argumenst: [dataset] [output_file]\n")
+    RESULTS_CSV = Path(sys.argv[1])
     data = load_results(RESULTS_CSV)
     channel_cols = [c for c in data.columns if c.startswith("channel_")]
     results = aggregate_by_algorithm(data,channel_cols)
 
-    plot_speed_comparison(results, "results/speed_comparison.png")
-    plot_hash_per_sec_comparison(results, Path("results/hash_per_sec_comparison.png"))
+    #plot_speed_comparison(results,Path(sys.argv[2] +  "speed_comparison.png"))
+    #plot_hash_per_sec_comparison(results, Path(sys.argv[2] + "hash_per_sec_comparison.png"))
 
-    plot_fairness_comparison(results,"fairness_median", Path("results/fairness_MEDIAN_comparison.png"))
-    plot_fairness_comparison(results,"fairness_worst", Path("results/fairness_WORST_comparison.png"))
+    plot_fairness_comparison(results,"fairness_median", Path(sys.argv[2]) / "fairness_MEDIAN_comparison.png")
+    plot_fairness_comparison(results,"fairness_worst", Path(sys.argv[2]) / "fairness_WORST_comparison.png")
 
-    plot_min_max_comparison(results,"min_max_diff_median", Path("results/min_max_MEDIAN_diff_comparison.png"))
-    plot_min_max_comparison(results,"min_max_diff_worst", Path("results/min_max_WORST_comparison.png"))
+    plot_min_max_comparison(results,"min_max_diff_median", Path(sys.argv[2]) / "min_max_MEDIAN_diff_comparison.png")
+    plot_min_max_comparison(results,"min_max_diff_worst", Path(sys.argv[2]) / "min_max_WORST_comparison.png")
 
-    plot_chi_comparison(results,"chi_median", Path("results/chi_square_MEDIAN_dif_comparison.png"))
-    plot_chi_comparison(results,"chi_worst", Path("results/chi_square_WORST_dif_comparison.png"))
+    plot_chi_comparison(results,"chi_median", Path(sys.argv[2]) / "chi_square_MEDIAN_dif_comparison.png")
+    plot_chi_comparison(results,"chi_worst", Path(sys.argv[2]) / "chi_square_WORST_dif_comparison.png")
 
 if __name__ == "__main__":
     main()
