@@ -22,6 +22,7 @@ namespace {
     constexpr uint32_t KEY_SEED =  65536;
     constexpr std::size_t NUM_KEYS = 32;
     constexpr std::size_t RSS_KEY_SIZE = 16;
+    constexpr std::array<int, 8> CHANNEL_COUNTS = {4,8,12,16,24,32,64,128};
 }
 
 std::vector<std::array<uint8_t, RSS_KEY_SIZE>> getKeys() { 
@@ -40,8 +41,8 @@ std::vector<std::array<uint8_t, RSS_KEY_SIZE>> getKeys() {
 }
 
 int main(int argc, char* argv[]) {
-    if(argc != 4) {
-        std::cerr << "tu run the analysis main needs 3 argumenst: [dataset] [output_file], [DMA]\n";
+    if(argc != 3) {
+        std::cerr << "tu run the analysis main needs 3 argumenst: [dataset] [output_file]\n";
         return 1;
     }
 
@@ -110,4 +111,49 @@ int main(int argc, char* argv[]) {
     }
 
     return 0;
+}
+
+double computeFairness(std::vector<int> histogram,double tuple_count) {
+    if (histogram.empty() || tuple_count == 0) {
+        return 0.0; 
+    }
+    double sum = 0.0, sum_sq = 0.0;
+    for (int x : histogram) {
+        sum += x;
+        sum_sq += x * x;
+    }
+    return( sum * sum ) / ( sum_sq * histogram.size());
+}
+
+
+double computeChi(const std::vector<int>& histogram, double tuple_count) {
+    if (histogram.empty() || tuple_count == 0) {
+        return 0.0;
+    }
+
+    double n = histogram.size();
+    double expected = tuple_count / n;
+
+    double chi2 = 0.0;
+    for (int x : histogram) {
+        double diff = x - expected;
+        chi2 += (diff * diff) / expected;
+    }
+
+    return chi2 / tuple_count;
+}
+
+
+double computeMinMaxDiff(const std::vector<int>& histogram, std::size_t tuple_count) {
+    if (histogram.empty() || tuple_count == 0) {
+        return 0.0; 
+    }
+    int min_val = *std::min_element(histogram.begin(), histogram.end());
+    int max_val = *std::max_element(histogram.begin(), histogram.end());
+
+    int diff = max_val - min_val;
+
+    double percentage = (diff / static_cast<double>(tuple_count)) * 100.0;
+
+    return percentage;
 }
