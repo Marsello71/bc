@@ -18,7 +18,8 @@
 #include <random>
 #include <vector>
 #include <algorithm>
-
+#include <cstdlib>
+ 
 namespace {
     constexpr uint32_t KEY_SEED =  65536;
     constexpr std::size_t NUM_KEYS = 32;
@@ -86,11 +87,22 @@ double computeMinMaxDiff(const std::vector<int>& histogram, std::size_t tuple_co
     return percentage;
 }
 
+std::array<uint8_t, TUPLE_SIZE> symmetric_control_bit(const std::array<uint8_t, TUPLE_SIZE> &tuple) {
+    std::array<uint8_t, TUPLE_SIZE> xor_key;
+    for(size_t i = 0; i < (TUPLE_SIZE-1)/2; i++) {
+        xor_key[i] = tuple[i] ^ tuple[i+18];
+        xor_key[i+18] = tuple[i] ^ tuple[i+18];
+    }
+    xor_key[36] = tuple[36];
+    return xor_key;
+}   
+
 int main(int argc, char* argv[]) {
-    if(argc != 3) {
-    std::cerr << "tu run the analysis main needs 3 argumenst: [dataset] [output_file]\n";
+    if(argc != 4) {
+    std::cerr << "tu run the analysis main needs 4 argumenst: [dataset] [output_file] [symetri 1/0]\n";
         return 1;
     }
+    int symmetry = atoi(argv[3]);
 
     std::ifstream reader(argv[1]);
     if (!reader.is_open()) {
@@ -139,7 +151,13 @@ int main(int argc, char* argv[]) {
 
             auto start = std::chrono::steady_clock::now();
             for (const auto &tuple : tuples) {
-                uint32_t hash = algo.fn(tuple.data(), tuple.size(), keys[i].data());
+                uint32_t hash ;
+                if(symmetry) {
+                    hash = algo.fn(symmetric_control_bit(tuple).data(), tuple.size(), keys[i].data());
+                } else { 
+                    hash = algo.fn(tuple.data(), tuple.size(), keys[i].data());
+                }
+                
 
                 for(std::size_t j = 0; j < CHANNEL_COUNTS.size(); j++) {
                     int channel = static_cast<int>(hash % CHANNEL_COUNTS[j]);
