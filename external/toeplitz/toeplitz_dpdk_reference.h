@@ -1,7 +1,6 @@
 /**
  * @file toeplitz_dpdk_reference.h
- * @brief Reference Toeplitz RSS hash, vendored from DPDK for cross-checking
- * the candidate implementation in toeplitz.cpp/toeplitz.h.
+ * @brief Reference Toeplitz RSS hash, vendored from DPDK
  *
  * Vendored (algorithm unchanged) from DPDK lib/hash/rte_thash.h, function
  * rte_softrss(). Original copyright:

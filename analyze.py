@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import sys
 
-CRYPTO_ALGOS = {"chaskey", "halfsiphash", "siphash", "ascon"}
-NON_CRYPTO_ALGOS = {"crc32c", "jhash", "spookyhash"}
+CRYPTO_ALGOS = {"chaskey", "halfsiphash", "siphash", "ascon", "toeplitz"}
+NON_CRYPTO_ALGOS = {"crc32c", "jhash", "spookyhash" ,"toeplitz"}
 
 
 def load_results(csv_path : Path) -> pd.DataFrame:
@@ -59,12 +59,18 @@ def plot_channel_scaling(data : pd.DataFrame, column : str,output_path : Path) -
     for name in CRYPTO_ALGOS : 
         algo_data = data[data["algorithm"] == name]
         algo_data = algo_data.sort_values("num_channels")
-        ax1.plot(algo_data["num_channels"],algo_data[column], marker="o", label=name)
+        if name == "toeplitz" : 
+            ax1.plot(algo_data["num_channels"],algo_data[column], marker="o", label=name, linestyle = "--", color="black")
+        else :
+            ax1.plot(algo_data["num_channels"],algo_data[column], marker="o", label=name)
 
     for name in NON_CRYPTO_ALGOS : 
         algo_data = data[data["algorithm"] == name]
         algo_data = algo_data.sort_values("num_channels")
-        ax2.plot(algo_data["num_channels"],algo_data[column], marker="o", label=name)
+        if name == "toeplitz" : 
+            ax2.plot(algo_data["num_channels"],algo_data[column], marker="o", label=name, linestyle = "--", color="black")
+        else :
+            ax2.plot(algo_data["num_channels"],algo_data[column], marker="o", label=name)
 
     ax1.set_title("Cryptogrphic")
     ax2.set_title("Non-cryptogrphic")
