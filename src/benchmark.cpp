@@ -17,12 +17,13 @@
 #include <iostream>
 #include <random>
 #include <vector>
+#include <algorithm>
 
 namespace {
     constexpr uint32_t KEY_SEED =  65536;
     constexpr std::size_t NUM_KEYS = 32;
     constexpr std::size_t RSS_KEY_SIZE = 16;
-    constexpr std::array<int, 8> CHANNEL_COUNTS = {4,8,12,16,24,32,64,128};
+    constexpr std::array<int, 6> CHANNEL_COUNTS = {4,8,16,32,64,128};
 }
 
 std::vector<std::array<uint8_t, RSS_KEY_SIZE>> getKeys() { 
@@ -40,85 +41,12 @@ std::vector<std::array<uint8_t, RSS_KEY_SIZE>> getKeys() {
     return keys;
 }
 
-int main(int argc, char* argv[]) {
-    if(argc != 3) {
-        std::cerr << "tu run the analysis main needs 3 argumenst: [dataset] [output_file]\n";
-        return 1;
-    }
-
-    std::ifstream reader(argv[1]);
-    if (!reader.is_open()) {
-        std::cerr << "Failed to open file for reading\n";
-        return 1;
-    }
-
-    std::ofstream results(argv[2]);
-    if (!results.is_open()) {
-        std::cerr << "Failed to open file for writing\n";
-        return 1;
-    }
-
-    const int DMA = std::stoi(argv[3]);
-
-    std::vector<std::array<uint8_t, TUPLE_SIZE>> tuples;
-    tuples.reserve(5000000);
-
-    std::string line;
-    std::getline(reader, line); // skip CSV header
-
-    while (std::getline(reader, line)) {
-        if (line.empty()) continue;
-
-        try {
-            tuples.push_back(parseLineToTuple(line));
-        } catch (const std::exception &e) {
-            std::cerr << "Skipping malformed line: " << e.what() << "\n";
-        }
-    }
-
-    std::cout << "Loaded " << tuples.size() << " tuples.\n";
-
-    results << "algorithm,tuple_count,total_time_ns,avg_time_ns,key_id";
-    for (int c = 0; c < DMA; c++) {
-        results << ",channel_" << c;
-    }
-    results << "\n";
-
-    std::vector<std::array<uint8_t, RSS_KEY_SIZE>> keys = getKeys();
-
-    for (const auto &algo : hash_functions_arr) {
-
-        std::size_t key_count = algo.keyed ? NUM_KEYS : 1;
-        for(std::size_t i = 0; i < key_count; i++) {
-            std::vector<int> histogram(DMA, 0);
-
-            auto start = std::chrono::steady_clock::now();
-            for (const auto &tuple : tuples) {
-                uint32_t hash = algo.fn(tuple.data(), tuple.size(), keys[i].data());
-                int channel = static_cast<int>(hash % DMA);
-                histogram[channel]++;
-            }
-            auto end = std::chrono::steady_clock::now();
-            auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
-            double avg_ns = static_cast<double>(elapsed.count()) / static_cast<double>(tuples.size());
-            results << algo.name << "," << tuples.size() << "," << elapsed.count() << "," << avg_ns << ",";
-            if (algo.keyed) results << i; else results << "N/A";
-            for (int c = 0; c < DMA; c++) {
-                results << "," << histogram[c];
-            }
-            results << "\n";
-        }
-    }
-
-    return 0;
-}
-
 double computeFairness(std::vector<int> histogram,double tuple_count) {
     if (histogram.empty() || tuple_count == 0) {
         return 0.0; 
     }
     double sum = 0.0, sum_sq = 0.0;
-    for (int x : histogram) {
+    for (double x : histogram) {
         sum += x;
         sum_sq += x * x;
     }
@@ -157,3 +85,84 @@ double computeMinMaxDiff(const std::vector<int>& histogram, std::size_t tuple_co
 
     return percentage;
 }
+
+int main(int argc, char* argv[]) {
+    if(argc != 3) {
+    std::cerr << "tu run the analysis main needs 3 argumenst: [dataset] [output_file]\n";
+        return 1;
+    }
+
+    std::ifstream reader(argv[1]);
+    if (!reader.is_open()) {
+        std::cerr << "Failed to open file for reading\n";
+        return 1;
+    }
+
+    std::ofstream results(argv[2]);
+    if (!results.is_open()) {
+        std::cerr << "Failed to open file for writing\n";
+        return 1;
+    }
+
+    std::vector<std::array<uint8_t, TUPLE_SIZE>> tuples;
+    tuples.reserve(5000000);
+
+    std::string line;
+    std::getline(reader, line); // skip CSV header
+
+    while (std::getline(reader, line)) {
+        if (line.empty()) continue;
+
+        try {
+            tuples.push_back(parseLineToTuple(line));
+        } catch (const std::exception &e) {
+            std::cerr << "Skipping malformed line: " << e.what() << "\n";
+        }
+    }
+
+    std::cout << "Loaded " << tuples.size() << " tuples.\n";
+
+    results << "algorithm,tuple_count,avg_time_ns,key_id,num_channels,fairness,chi,min_max_diff";
+    results << "\n";
+
+    std::vector<std::array<uint8_t, RSS_KEY_SIZE>> keys = getKeys();
+
+    for (const auto &algo : hash_functions_arr) {
+        std::size_t key_count = algo.keyed ? NUM_KEYS : 1;
+
+        for(std::size_t i = 0; i < key_count; i++) {
+            std::vector<std::vector<int>> histograms(CHANNEL_COUNTS.size());
+            
+            for(std::size_t j = 0; j < CHANNEL_COUNTS.size(); j++){ 
+                histograms[j] = std::vector<int>(CHANNEL_COUNTS[j], 0);
+            }
+
+            auto start = std::chrono::steady_clock::now();
+            for (const auto &tuple : tuples) {
+                uint32_t hash = algo.fn(tuple.data(), tuple.size(), keys[i].data());
+
+                for(std::size_t j = 0; j < CHANNEL_COUNTS.size(); j++) {
+                    int channel = static_cast<int>(hash % CHANNEL_COUNTS[j]);
+                    histograms[j][channel]++;
+                }
+            }
+
+            auto end = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+            double avg_ns = static_cast<double>(elapsed.count()) / static_cast<double>(tuples.size());
+
+            for(std::size_t j = 0; j < CHANNEL_COUNTS.size(); j++) {
+                double fair    = computeFairness(histograms[j],tuples.size());
+                double chi     = computeChi(histograms[j],tuples.size());
+                double max_min = computeMinMaxDiff(histograms[j],tuples.size());
+
+                results << algo.name << "," << tuples.size() << "," << avg_ns << ",";
+                if (algo.keyed) results << i; else results << "N/A";
+                results << "," << CHANNEL_COUNTS[j] << "," << fair << "," << chi << "," << max_min  << "\n";
+            }
+        }
+    }
+
+    return 0;
+}
+
