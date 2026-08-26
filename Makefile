@@ -4,8 +4,6 @@ CXXFLAGS := -std=c++17 -Wall -Wextra -O3
 BUILD_DIR := build
 TARGET := benchmark
 
-# external/toeplitz is excluded: broken (relies on undefined DPDK symbols)
-# and not yet referenced by any wrapper.
 SRCS := $(wildcard src/*.cpp) \
         $(wildcard src/wrappers/*.cpp) \
         $(wildcard external/chaskey/*.cpp) \
@@ -13,6 +11,7 @@ SRCS := $(wildcard src/*.cpp) \
         $(wildcard external/spookyhash/*.cpp) \
         $(wildcard external/ascon/*.cpp) \
         $(wildcard external/jhash/*.cpp) \
+        $(wildcard external/toeplitz/*.cpp) \
         $(wildcard external/crc32c/*.cpp)
 
 OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
