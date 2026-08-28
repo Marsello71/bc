@@ -22,6 +22,7 @@
  
 namespace {
     constexpr uint32_t KEY_SEED =  65536;
+    constexpr uint32_t WINDOW_SIZE =  100000;
     constexpr std::size_t NUM_KEYS = 32;
     constexpr std::size_t RSS_KEY_SIZE = 16;
     constexpr std::array<int, 6> CHANNEL_COUNTS = {4,8,16,32,64,128};
@@ -87,6 +88,18 @@ double computeMinMaxDiff(const std::vector<int>& histogram, std::size_t tuple_co
     return percentage;
 }
 
+double computeMaxDiffRun(const std::vector<int>& histogram, std::size_t count,int DMA_channels) {
+    if (histogram.empty() || count == 0) {
+        return 0.0; 
+    }
+    int max_val = *std::max_element(histogram.begin(), histogram.end());
+
+    double avg = count / DMA_channels;
+    double diff = max_val-avg;
+
+    return diff/avg;
+}
+
 std::array<uint8_t, TUPLE_SIZE> symmetric_control_bit(const std::array<uint8_t, TUPLE_SIZE> &tuple) {
     std::array<uint8_t, TUPLE_SIZE> xor_key;
     for(size_t i = 0; i < (TUPLE_SIZE-1)/2; i++) {
@@ -134,8 +147,11 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Loaded " << tuples.size() << " tuples.\n";
 
-    results << "algorithm,tuple_count,avg_time_ns,key_id,num_channels,fairness,chi,min_max_diff";
+    results << "algorithm,tuple_run_index,key_id,num_channels,fairness,chi,min_max_diff,max_diff";
     results << "\n";
+
+    //results << "algorithm,tuple_count,avg_time_ns,key_id,num_channels,fairness,chi,min_max_diff,max_avg_run_diff";
+    //results << "\n";
 
     std::vector<std::array<uint8_t, RSS_KEY_SIZE>> keys = getKeys();
 
@@ -148,9 +164,10 @@ int main(int argc, char* argv[]) {
             for(std::size_t j = 0; j < CHANNEL_COUNTS.size(); j++){ 
                 histograms[j] = std::vector<int>(CHANNEL_COUNTS[j], 0);
             }
-
-            auto start = std::chrono::steady_clock::now();
+            size_t count = 0;
+            //auto start = std::chrono::steady_clock::now();
             for (const auto &tuple : tuples) {
+                count++;
                 uint32_t hash ;
                 if(symmetry) {
                     hash = algo.fn(symmetric_control_bit(tuple).data(), tuple.size(), keys[i].data());
@@ -162,25 +179,27 @@ int main(int argc, char* argv[]) {
                 for(std::size_t j = 0; j < CHANNEL_COUNTS.size(); j++) {
                     int channel = static_cast<int>(hash % CHANNEL_COUNTS[j]);
                     histograms[j][channel]++;
+                    if(count % WINDOW_SIZE == 0 || count == tuples.size()) {
+                        double tuple_number = (count % WINDOW_SIZE == 0) ? WINDOW_SIZE : count % WINDOW_SIZE;
+                        size_t tuple_run_index = (count % WINDOW_SIZE == 0) ? count / WINDOW_SIZE : count / WINDOW_SIZE + 1;
+
+                        double fair            = computeFairness(histograms[j],tuple_number);
+                        double chi             = computeChi(histograms[j],tuple_number);
+                        double max_min         = computeMinMaxDiff(histograms[j],tuple_number);
+                        double max_diff_run    =  computeMaxDiffRun(histograms[j], tuple_number,CHANNEL_COUNTS[j]);
+
+                        results << algo.name << "," << tuple_run_index << ","; // << avg_ns << ",";
+                        if (algo.keyed) results << i; else results << "N/A";
+                        results << "," << CHANNEL_COUNTS[j] << "," << fair << "," << chi << "," << max_min  << "," << max_diff_run <<"\n";
+                        std::fill(histograms[j].begin(), histograms[j].end(),0);
+                    }
                 }
             }
-
-            auto end = std::chrono::steady_clock::now();
+            /*auto end = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
-            double avg_ns = static_cast<double>(elapsed.count()) / static_cast<double>(tuples.size());
-
-            for(std::size_t j = 0; j < CHANNEL_COUNTS.size(); j++) {
-                double fair    = computeFairness(histograms[j],tuples.size());
-                double chi     = computeChi(histograms[j],tuples.size());
-                double max_min = computeMinMaxDiff(histograms[j],tuples.size());
-
-                results << algo.name << "," << tuples.size() << "," << avg_ns << ",";
-                if (algo.keyed) results << i; else results << "N/A";
-                results << "," << CHANNEL_COUNTS[j] << "," << fair << "," << chi << "," << max_min  << "\n";
-            }
+            double avg_ns = static_cast<double>(elapsed.count()) / static_cast<double>(count); */
         }
     }
 
     return 0;
 }
-
