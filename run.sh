@@ -3,7 +3,7 @@
 echo "running rss_analyzer.cpp"
 make 
 
-symmetry=0
+symmetry=1
 
 echo $symmetry
 

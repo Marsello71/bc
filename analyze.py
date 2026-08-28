@@ -90,14 +90,14 @@ def plot_channel_scaling(data : pd.DataFrame, column : str,output_path : Path) -
 """
 def plot_algo_grid(data, median_col, worst_col, algos, nrows, ncols, output_path, DMA, y_label) -> None:
 
-    fig, axes= plt.subplots(nrows, ncols, figsize=(12, 8), sharey=True)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(12, 8), sharey=True, constrained_layout=True)
     toeplitz_data = data[(data["algorithm"] == "toeplitz") & (data["num_channels"] == DMA)]
 
     for ax, name in zip(axes.flat, algos) :
         algo_data = data[(data["algorithm"] == name) & (data["num_channels"] == DMA)]
         ax.plot(toeplitz_data["tuple_run_index"],toeplitz_data[median_col], label="Toeplitz", linestyle = "--", color="black")
-        ax.plot(algo_data["tuple_run_index"],algo_data[median_col], label="Median")
         ax.plot(algo_data["tuple_run_index"],algo_data[worst_col], label="Worst")
+        ax.plot(algo_data["tuple_run_index"],algo_data[median_col], label="Median")
         ax.set_xlabel("Window index (1 window = 100,000 tuples)")
         ax.set_title(name)
         ax.ticklabel_format(axis="y", useOffset=False, style="plain")
@@ -113,7 +113,6 @@ def plot_algo_grid(data, median_col, worst_col, algos, nrows, ncols, output_path
 
     handles, labels = axes.flat[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper right")
-    fig.tight_layout()
 
     fig.savefig(output_path)
     plt.close(fig)
@@ -157,17 +156,17 @@ def main() :
 
     plot_algo_grid(results, "chi_median", "chi_worst", CRYPTO_ALGOS, 2, 2,
                     Path(sys.argv[2]) / "chi_CRYPTO_grid.png", DMA,
-                    "Normalized χ² statistic (χ²/tuple_count, lower = more uniform)")
+                    "Normalized χ² statistic\n(χ²/tuple_count, lower = more uniform)")
     plot_algo_grid(results, "chi_median", "chi_worst", NON_CRYPTO_ALGOS, 2, 2,
                     Path(sys.argv[2]) / "chi_NONCRYPTO_grid.png", DMA,
-                    "Normalized χ² statistic (χ²/tuple_count, lower = more uniform)")
+                    "Normalized χ² statistic\n(χ²/tuple_count, lower = more uniform)")
 
     plot_algo_grid(results, "max_diff_median", "max_diff_worst", CRYPTO_ALGOS, 2, 2,
                     Path(sys.argv[2]) / "max_avg_diff_CRYPTO_grid.png", DMA,
-                    "Peak channel overload (fraction above fair share, 0 = perfectly fair)")
+                    "Peak channel overload \n(fraction above fair share, 0 = perfectly fair)")
     plot_algo_grid(results, "max_diff_median", "max_diff_worst", NON_CRYPTO_ALGOS, 2, 2,
                     Path(sys.argv[2]) / "max_avg_diff_NONCRYPTO_grid.png", DMA,
-                    "Peak channel overload (fraction above fair share, 0 = perfectly fair)")
+                    "Peak channel overload \n(fraction above fair share, 0 = perfectly fair)")
 
 
 if __name__ == "__main__":
