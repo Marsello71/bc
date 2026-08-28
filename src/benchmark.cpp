@@ -22,7 +22,7 @@
  
 namespace {
     constexpr uint32_t KEY_SEED =  65536;
-    constexpr uint32_t WINDOW_SIZE =  100000;
+    constexpr uint32_t WINDOW_SIZE =  250000;
     constexpr std::size_t NUM_KEYS = 32;
     constexpr std::size_t RSS_KEY_SIZE = 16;
     constexpr std::array<int, 6> CHANNEL_COUNTS = {4,8,16,32,64,128};
@@ -100,7 +100,7 @@ double computeMaxDiffRun(const std::vector<int>& histogram, std::size_t count,in
     return diff/avg;
 }
 
-std::array<uint8_t, TUPLE_SIZE> symmetric_control_bit(const std::array<uint8_t, TUPLE_SIZE> &tuple) {
+std::array<uint8_t, TUPLE_SIZE> symmetric_control_bit_XOR(const std::array<uint8_t, TUPLE_SIZE> &tuple) {
     std::array<uint8_t, TUPLE_SIZE> xor_key;
     for(size_t i = 0; i < (TUPLE_SIZE-1)/2; i++) {
         xor_key[i] = tuple[i] ^ tuple[i+18];
@@ -108,7 +108,25 @@ std::array<uint8_t, TUPLE_SIZE> symmetric_control_bit(const std::array<uint8_t, 
     }
     xor_key[36] = tuple[36];
     return xor_key;
-}   
+} 
+
+std::array<uint8_t, TUPLE_SIZE> symmetric_control_bit(const std::array<uint8_t, TUPLE_SIZE> &tuple) {
+    std::array<uint8_t, TUPLE_SIZE> sorted_key;
+
+    int ip_cmp = memcmp(&tuple[0], &tuple[18], 16);
+    bool need_swap = (ip_cmp < 0) || (ip_cmp == 0 && memcmp(&tuple[16], &tuple[34], 2) < 0);
+
+    if (need_swap) {
+        memcpy(&sorted_key[0], &tuple[18], 18);
+        memcpy(&sorted_key[18], &tuple[0], 18);
+    } else {
+        memcpy(&sorted_key[0], &tuple[0], 36);
+    }
+    sorted_key[36] = tuple[36];
+
+    return sorted_key;
+}
+
 
 int main(int argc, char* argv[]) {
     if(argc != 4) {
@@ -170,7 +188,11 @@ int main(int argc, char* argv[]) {
                 count++;
                 uint32_t hash ;
                 if(symmetry) {
-                    hash = algo.fn(symmetric_control_bit(tuple).data(), tuple.size(), keys[i].data());
+                    if(symmetry == 1 ) {
+                        hash = algo.fn(symmetric_control_bit_XOR(tuple).data(), tuple.size(), keys[i].data());
+                    } else {
+                        hash = algo.fn(symmetric_control_bit(tuple).data(), tuple.size(), keys[i].data());
+                    }
                 } else { 
                     hash = algo.fn(tuple.data(), tuple.size(), keys[i].data());
                 }
