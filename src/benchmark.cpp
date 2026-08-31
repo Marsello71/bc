@@ -22,7 +22,7 @@
  
 namespace {
     constexpr uint32_t KEY_SEED =  65536;
-    constexpr uint32_t WINDOW_SIZE =  250000;
+    constexpr uint32_t WINDOW_SIZE =  100000;
     constexpr std::size_t NUM_KEYS = 32;
     constexpr std::size_t RSS_KEY_SIZE = 16;
     constexpr std::array<int, 6> CHANNEL_COUNTS = {4,8,16,32,64,128};
@@ -201,9 +201,11 @@ int main(int argc, char* argv[]) {
                 for(std::size_t j = 0; j < CHANNEL_COUNTS.size(); j++) {
                     int channel = static_cast<int>(hash % CHANNEL_COUNTS[j]);
                     histograms[j][channel]++;
-                    if(count % WINDOW_SIZE == 0 || count == tuples.size()) {
-                        double tuple_number = (count % WINDOW_SIZE == 0) ? WINDOW_SIZE : count % WINDOW_SIZE;
-                        size_t tuple_run_index = (count % WINDOW_SIZE == 0) ? count / WINDOW_SIZE : count / WINDOW_SIZE + 1;
+                    if(count % WINDOW_SIZE == 0) {
+                       // double tuple_number = (count % WINDOW_SIZE == 0) ? WINDOW_SIZE : count % WINDOW_SIZE;
+                       // size_t tuple_run_index = (count % WINDOW_SIZE == 0) ? count / WINDOW_SIZE : count / WINDOW_SIZE + 1;
+                        double tuple_number = WINDOW_SIZE;
+                        ssize_t tuple_run_index = count / WINDOW_SIZE;
 
                         double fair            = computeFairness(histograms[j],tuple_number);
                         double chi             = computeChi(histograms[j],tuple_number);
