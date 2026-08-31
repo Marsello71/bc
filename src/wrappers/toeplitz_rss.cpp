@@ -10,5 +10,6 @@ uint32_t toeplitzRssWrapper(const uint8_t *data, size_t /*length*/ , const uint8
         input_tuple[i] = load32(&data[i*4]);
     }
     
+    
     return rte_softrss(input_tuple, TOEPLITZ_WORDS, TOEPLITZ_KEY);
 }

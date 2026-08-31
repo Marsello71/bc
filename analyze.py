@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 
 CRYPTO_ALGOS = {"chaskey", "halfsiphash", "siphash", "ascon"}
-NON_CRYPTO_ALGOS = {"crc32c", "jhash", "spookyhash"}
+NON_CRYPTO_ALGOS = {"crc32c", "jhash", "spookyhash", "nsgahash4"}
 
 
 def load_results(csv_path : Path) -> pd.DataFrame:
@@ -101,10 +101,6 @@ def plot_algo_grid(data, median_col, worst_col, algos, nrows, ncols, output_path
         ax.set_xlabel("Window index (1 window = 100,000 tuples)")
         ax.set_title(name)
         ax.ticklabel_format(axis="y", useOffset=False, style="plain")
-
-
-    for ax in axes.flat[len(algos):]:
-        ax.axis("off")
 
     for ax in axes[:, 0]:
         ax.set_ylabel(y_label)
