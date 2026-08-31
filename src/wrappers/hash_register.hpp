@@ -9,15 +9,18 @@
 
 #include <array>
 
-#include "ascon_rss.h"
 #include "chaskey_rss.h"
 #include "siphash_rss.h"
 #include "halfsiphash_rss.h"
-#include "spookyhash_rss.h"
 #include "jhash_rss.h"
-#include "crc32c_rss.h"
 #include "toeplitz_rss.h"
+#include "xorhash_rss.h"
+/*
+#include "ascon_rss.h"
+#include "spookyhash_rss.h"
+#include "crc32c_rss.h"
 #include "nsgahash4_rss.h"
+*/
 
 using RssHashFunction  = uint32_t (*)(const uint8_t *, size_t, const uint8_t *);
 
@@ -28,6 +31,6 @@ typedef struct
    bool keyed;
 }hash_algoritm;
 
-extern const std::array<hash_algoritm, 9> hash_functions_arr;
+extern const std::array<hash_algoritm, 6> hash_functions_arr;
 
  #endif //HASH_REGISTER_HPP

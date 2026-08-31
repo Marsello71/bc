@@ -1,14 +1,17 @@
 #include "hash_register.hpp" 
 
 
-const std::array<hash_algoritm, 9> hash_functions_arr = {{
+const std::array<hash_algoritm, 6> hash_functions_arr = {{
+        /*
         {"ascon", asconRssWrapper, false},
         {"crc32c", crc32cRssWrapper, false},
         {"nsgahash4", nsgahashRssWrapper, false},
-        {"toeplitz", toeplitzRssWrapper, false},
+        {"spookyhash", spookyhashRssWrapper, true},
+        */
+        {"toeplitz", toeplitzRssWrapper, true},
         {"jhash", jhashlittleRssWrapper, true},
         {"chaskey", chaskeyRssWrapper, true},
         {"halfsiphash", halfSipHashRssWrapper, true},
         {"siphash", sipHashRssWrapper, true},
-        {"spookyhash", spookyhashRssWrapper, true}
+        {"xorhash", xorHashRssWrapper, true}
 }};
