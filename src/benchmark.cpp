@@ -19,13 +19,14 @@
 #include <vector>
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
  
 namespace {
     constexpr uint32_t KEY_SEED =  65536;
-    constexpr uint32_t WINDOW_SIZE =  100000;
-    constexpr std::size_t NUM_KEYS = 32;
-    constexpr std::size_t RSS_KEY_SIZE = 16;
-    constexpr std::array<int, 6> CHANNEL_COUNTS = {4,8,16,32,64,128};
+    constexpr uint32_t WINDOW_SIZE =  250000;
+    constexpr std::size_t NUM_KEYS = 16;
+    constexpr std::size_t RSS_KEY_SIZE = 40;
+    constexpr std::array<int, 7> CHANNEL_COUNTS = {8,16,20,32,40,64,128};
 }
 
 std::vector<std::array<uint8_t, RSS_KEY_SIZE>> getKeys() { 
@@ -94,10 +95,24 @@ double computeMaxDiffRun(const std::vector<int>& histogram, std::size_t count,in
     }
     int max_val = *std::max_element(histogram.begin(), histogram.end());
 
-    double avg = count / DMA_channels;
+    double avg = count / (double)DMA_channels;
     double diff = max_val-avg;
 
     return diff/avg;
+}
+
+double computeOverThressholdSum(const std::vector<int>& histogram, std::size_t count,int DMA_channels) {
+    if (histogram.empty() || count == 0) {
+        return 0.0; 
+    }
+    double avg = count / (double)DMA_channels;
+    double sum = 0;
+    for(int i = 0; i < DMA_channels; i++) {
+        if(histogram[i] > avg) {
+            sum+= histogram[i]-avg;
+        }
+    }
+    return sum / (WINDOW_SIZE / 1000.0);
 }
 
 std::array<uint8_t, TUPLE_SIZE> symmetric_control_bit_XOR(const std::array<uint8_t, TUPLE_SIZE> &tuple) {
@@ -130,7 +145,7 @@ std::array<uint8_t, TUPLE_SIZE> symmetric_control_bit(const std::array<uint8_t, 
 
 int main(int argc, char* argv[]) {
     if(argc != 4) {
-    std::cerr << "tu run the analysis main needs 4 argumenst: [dataset] [output_file] [symetri 1/0]\n";
+    std::cerr << "tu run the analysis main needs 4 argumenst: [dataset] [output_file] [symetri 2/1/0]\n";
         return 1;
     }
     int symmetry = atoi(argv[3]);
@@ -165,8 +180,11 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Loaded " << tuples.size() << " tuples.\n";
 
-    results << "algorithm,tuple_run_index,key_id,num_channels,fairness,chi,min_max_diff,max_diff";
+    results << "algorithm,tuple_run_index,key_id,num_channels,thresshold_sum";
     results << "\n";
+
+    //results << "algorithm,tuple_run_index,key_id,num_channels,fairness,chi,min_max_diff,max_diff";
+    //results << "\n";
 
     //results << "algorithm,tuple_count,avg_time_ns,key_id,num_channels,fairness,chi,min_max_diff,max_avg_run_diff";
     //results << "\n";
@@ -207,14 +225,15 @@ int main(int argc, char* argv[]) {
                         double tuple_number = WINDOW_SIZE;
                         ssize_t tuple_run_index = count / WINDOW_SIZE;
 
-                        double fair            = computeFairness(histograms[j],tuple_number);
-                        double chi             = computeChi(histograms[j],tuple_number);
-                        double max_min         = computeMinMaxDiff(histograms[j],tuple_number);
-                        double max_diff_run    =  computeMaxDiffRun(histograms[j], tuple_number,CHANNEL_COUNTS[j]);
+                       // double fair            = computeFairness(histograms[j],tuple_number);
+                       // double chi             = computeChi(histograms[j],tuple_number);
+                       // double max_min         = computeMinMaxDiff(histograms[j],tuple_number);
+                       //double max_diff_run    =  computeMaxDiffRun(histograms[j], tuple_number,CHANNEL_COUNTS[j]);
+                       double sum_over_thresshol = computeOverThressholdSum(histograms[j],tuple_number,CHANNEL_COUNTS[j]);
 
                         results << algo.name << "," << tuple_run_index << ","; // << avg_ns << ",";
                         if (algo.keyed) results << i; else results << "N/A";
-                        results << "," << CHANNEL_COUNTS[j] << "," << fair << "," << chi << "," << max_min  << "," << max_diff_run <<"\n";
+                        results << "," << CHANNEL_COUNTS[j] << "," << sum_over_thresshol << "\n" ; //"," << fair << "," << chi << "," << max_min  << "," << max_diff_run
                         std::fill(histograms[j].begin(), histograms[j].end(),0);
                     }
                 }

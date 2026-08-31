@@ -8,12 +8,8 @@ SRCS := $(wildcard src/*.cpp) \
         $(wildcard src/wrappers/*.cpp) \
         $(wildcard external/chaskey/*.cpp) \
         $(wildcard external/siphash/*.cpp) \
-        $(wildcard external/spookyhash/*.cpp) \
-        $(wildcard external/ascon/*.cpp) \
         $(wildcard external/jhash/*.cpp) \
-        $(wildcard external/toeplitz/*.cpp) \
-        $(wildcard external/nsgahash/*.cpp) \
-        $(wildcard external/crc32c/*.cpp)       
+        $(wildcard external/toeplitz/*.cpp)      
 
 OBJS := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
