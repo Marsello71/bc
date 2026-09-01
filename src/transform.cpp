@@ -8,34 +8,56 @@
 #include "transform.hpp"
 
 #include <cstring>
+#include <cstdlib>
+
+
+static std::array<uint8_t, TUPLE_SIZE> symmetric_xor(const std::array<uint8_t, TUPLE_SIZE> &tuple) {
+    std::array<uint8_t, TUPLE_SIZE> xor_key;
+    for(size_t i = 0; i < (TUPLE_SIZE-1)/2; i++) {
+        xor_key[i] = tuple[i] ^ tuple[i+18];
+        xor_key[i+18] = tuple[i] ^ tuple[i+18];
+    }
+    xor_key[36] = tuple[36];
+    return xor_key;
+} 
+
+static std::array<uint8_t, TUPLE_SIZE> symmetric_sort(const std::array<uint8_t, TUPLE_SIZE> &tuple) {
+    std::array<uint8_t, TUPLE_SIZE> sorted_key;
+
+    int ip_cmp = memcmp(&tuple[0], &tuple[18], 16);
+    bool need_swap = (ip_cmp < 0) || (ip_cmp == 0 && memcmp(&tuple[16], &tuple[34], 2) < 0);
+
+    if (need_swap) {
+        memcpy(&sorted_key[0], &tuple[18], 18);
+        memcpy(&sorted_key[18], &tuple[0], 18);
+    } else {
+        memcpy(&sorted_key[0], &tuple[0], 36);
+    }
+    sorted_key[36] = tuple[36];
+
+    return sorted_key;
+}
 
 Symmetry parseSymmetry(const char *arg) {
-    // TODO: map "0"/"1"/"2" (and reject anything else) to the enum.
-    (void)arg;
-    return Symmetry::None;
+    switch (std::atoi(arg)) {
+        case 1:  return Symmetry::XorFold;
+        case 2:  return Symmetry::SortFold;
+        default: return Symmetry::None;
+    }
 }
 
 const char *symmetryName(Symmetry s) {
-    // TODO: switch over the three values.
-    (void)s;
-    return "none";
+    switch (s) {
+        case Symmetry::XorFold:  return "xorfold";
+        case Symmetry::SortFold: return "sortfold";
+        default:                 return "none";
+    }
 }
 
-void applySymmetry(Symmetry s,
-                   const std::array<uint8_t, TUPLE_SIZE> &in,
-                   std::array<uint8_t, TUPLE_SIZE> &out) {
-    using namespace tuple_layout;
-
-    // TODO:
-    //   None      -> out = in  (std::memcpy)
-    //   XorFold   -> port from benchmark.cpp symmetric_control_bit_XOR (lines ~118-126):
-    //                for each byte i in the first half, x = in[i] ^ in[i + halfspan];
-    //                write x into both halves. out[PROTOCOL_OFFSET] = in[PROTOCOL_OFFSET].
-    //   SortFold  -> port from benchmark.cpp symmetric_control_bit (lines ~128-143):
-    //                compare (srcip|srcport) vs (dstip|dstport); if src > dst swap the
-    //                two halves, else copy straight. Keep the protocol byte last.
-    //
-    // Watch the exact byte ranges — the old code folded (TUPLE_SIZE-1)/2 = 18 bytes.
-    (void)s;
-    std::memcpy(out.data(), in.data(), TUPLE_SIZE);
+std::array<uint8_t, TUPLE_SIZE> applySymmetry(Symmetry s, const std::array<uint8_t, TUPLE_SIZE> &in) {
+    switch (s) {
+        case Symmetry::XorFold:  return symmetric_xor(in);
+        case Symmetry::SortFold: return symmetric_sort(in);
+        default: return in;
+    }
 }

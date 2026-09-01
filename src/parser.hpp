@@ -12,9 +12,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "flow_data.hpp"
 
-/// Size of the generated key in bytes
-constexpr std::size_t TUPLE_SIZE = 37;
 
 /**
  * Split a CSV line into fields.

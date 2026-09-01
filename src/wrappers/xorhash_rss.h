@@ -12,6 +12,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "../endian.hpp"
 
 uint32_t xorHashRssWrapper(const uint8_t *data, size_t length, const uint8_t *key);
 

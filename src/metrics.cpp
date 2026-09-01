@@ -8,38 +8,45 @@
 #include "metrics.hpp"
 
 #include <algorithm>
+#include <cmath>
 
-double computeFairness(const std::vector<int>& hist, long window_packets, int channels) {
-    // TODO: benchmark.cpp:47-57. sum, sum_sq over hist; return (sum*sum)/(sum_sq*hist.size()).
-    // Guard: empty hist -> 0.0.
-    (void)window_packets; (void)channels;
-    return 0.0;
+// Jain's fairness index: (Σx)² / (n · Σx²).
+double computeFairness(const std::vector<int>& hist, long /*window_packets*/, int /*channels*/) {
+    if (hist.empty()) {
+        return 0.0;
+    }
+    double sum = 0.0, sum_sq = 0.0;
+    for (double num : hist) {          // iterate as double -> no int*int overflow
+        sum += num;
+        sum_sq += num * num;
+    }
+    return (sum * sum) / (sum_sq * hist.size());
 }
 
-double computeChi(const std::vector<int>& hist, long window_packets, int channels) {
-    // TODO: benchmark.cpp:60-75. e = window_packets / hist.size();
-    // chi2 += (x-e)*(x-e)/e; return chi2 / window_packets.
-    (void)channels;
-    (void)hist; (void)window_packets;
-    return 0.0;
+// Normalised Pearson chi-square: ( Σ (xᵢ − e)² / e ) / window_packets ,  e = window_packets / n.
+double computeChi(const std::vector<int>& hist, long window_packets, int /*channels*/) {
+    if (hist.empty() || window_packets == 0) {
+        return 0.0;
+    }
+    double e = static_cast<double>(window_packets) / hist.size();
+    double chi2 = 0.0;
+    for (int num : hist) {
+        double diff = num - e;
+        chi2 += (diff * diff) / e;
+    }
+    return chi2 / window_packets;
 }
 
-double computeMinMaxDiff(const std::vector<int>& hist, long window_packets, int channels) {
-    // TODO: benchmark.cpp:78-90. (max-min) / window_packets * 100.
-    (void)channels;
-    (void)hist; (void)window_packets;
-    return 0.0;
-}
-
-double computeMaxDiffRun(const std::vector<int>& hist, long window_packets, int channels) {
-    // TODO: benchmark.cpp:92-102. avg = window_packets / channels; return (max-avg)/avg.
-    (void)hist; (void)window_packets; (void)channels;
-    return 0.0;
-}
-
+// Packets above the fair share, summed over overloaded channels, in per-mille of the window.
 double computeOverThreshold(const std::vector<int>& hist, long window_packets, int channels) {
-    // TODO: benchmark.cpp:104-116. avg = window_packets / channels;
-    // sum += max(0, x-avg) over channels; return sum / (window_packets / 1000.0).
-    (void)hist; (void)window_packets; (void)channels;
-    return 0.0;
+    if (hist.empty() || window_packets == 0) {
+        return 0.0;
+    }
+    double avg = static_cast<double>(window_packets) / channels;
+    double sum = 0.0;
+    for (int num : hist) {
+        sum += std::max(0.0, num - avg);
+    }
+    return sum / (window_packets / 1000.0);
 }
+
