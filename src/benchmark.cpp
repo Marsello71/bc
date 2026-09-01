@@ -23,9 +23,9 @@
  
 namespace {
     constexpr uint32_t KEY_SEED =  65536;
-    constexpr uint32_t WINDOW_SIZE =  250000;
+    constexpr uint32_t WINDOW_SIZE =  150000;
     constexpr std::size_t NUM_KEYS = 16;
-    constexpr std::size_t RSS_KEY_SIZE = 40;
+    constexpr std::size_t RSS_KEY_SIZE = 64;
     constexpr std::array<int, 7> CHANNEL_COUNTS = {8,16,20,32,40,64,128};
 }
 
