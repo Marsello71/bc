@@ -38,7 +38,7 @@ public:
     void write(const ResultRow& row);
 
 private:
-    std::ostream& os_;
+    std::ostream& outstream;
 };
 
 #endif // RESULTS_WRITER_HPP

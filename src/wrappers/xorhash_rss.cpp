@@ -1,16 +1,6 @@
 #include "xorhash_rss.h"
 
 namespace {
-    // Same big-endian (network byte order) word assembly used by the other
-    // wrappers - kept as a local copy (not #include-d from toeplitz_rss.h)
-    // to avoid pulling in Toeplitz's own key table / duplicate-symbol issues.
-    inline uint32_t load32(const uint8_t *p) {
-        return  (static_cast<uint32_t>(p[0]) << 24) |
-                (static_cast<uint32_t>(p[1]) << 16) |
-                (static_cast<uint32_t>(p[2]) << 8 ) |
-                (static_cast<uint32_t>(p[3])      ) ;
-    }
-
     // Matches RSS_KEY_SIZE in benchmark.cpp (real NIC Toeplitz-style key
     // length); XOR-hash just consumes the whole thing.
     constexpr std::size_t XORHASH_KEY_BYTES = 40;

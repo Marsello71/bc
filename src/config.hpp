@@ -29,10 +29,9 @@ constexpr uint32_t WINDOW_SIZE = 150000;
 constexpr std::size_t NUM_KEYS = 16;
 
 /// Length of an RSS key in bytes.
-constexpr std::size_t RSS_KEY_SIZE = 64;
+constexpr std::size_t RSS_KEY_SIZE = 44;
 
 /// DMA channel counts under test. Powers of two and two non-powers (20, 40) —
-/// the non-powers are where XOR-fold hashing stops being key-invariant.
 constexpr std::array<int, 7> CHANNEL_COUNTS = {8, 16, 20, 32, 40, 64, 128};
 
 } // namespace config
