@@ -1,17 +1,27 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
-from matplotlib.ticker import ScalarFormatter
 
 from pathlib import Path
 import sys
 
-ALGOS = {"chaskey", "halfsiphash", "crc32c", "jhash"}
+CHANNELS = [8, 16, 20, 32, 40, 64, 128]
 
 COLORS = {
     "toeplitz": "black", "jhash": "#4C72B0", "chaskey": "#55A868",
-    "halfsiphash": "#C44E52", "crc32c": "#8172B2", "xorhash": "#CCB974",
+    "halfsiphash": "#C44E52", "xorhash": "#8172B2", "crc32c": "#CCB974",
 }
+# kreslene ako pomer k Toeplitzu; Toeplitz je referencna ciara 1.0, xorhash sa
+# tu nekresli (ma vlastny "dno" graf / bar chart).
+# rozdelene na dve dvojice - inak je v paneli prilis vela ciar naraz
+GROUP_A = ["chaskey", "halfsiphash"]   # krypto ARX
+GROUP_B = ["crc32c", "jhash"]          # nekrypto
+MARKERS = {"chaskey": "o", "crc32c": "s", "halfsiphash": "^", "jhash": "D"}
+LABELS = {
+    "chaskey": "Chaskey", "crc32c": "CRC32C",
+    "halfsiphash": "HalfSipHash", "jhash": "jhash (lookup3)",
+}
+METRIC_NAME = {"thresshold_sum": "Channel overload", "chi": "Distribution χ²"}
 
 
 def load_results(csv_path : Path) -> pd.DataFrame:
@@ -83,31 +93,63 @@ def plot_threshold_bar(data0, data1, data2, output_dir: Path, DMA):
     fig.savefig(output_dir / f"overload_bar_{DMA}.png", dpi=150)
     plt.close(fig)
 
-def plot_metric_vs_channels(agg, metric, output_path, log_y=False):
+def _toeplitz_ratio(agg: pd.DataFrame) -> pd.DataFrame:
+    """prida stlpec rel = mean / (Toeplitz mean pri rovnakej symetrii a poc. kanalov)"""
+    ref = (agg[agg["algorithm"] == "toeplitz"]
+           .rename(columns={"mean": "ref"})[["symmetry", "num_channels", "ref"]])
+    out = agg.merge(ref, on=["symmetry", "num_channels"], how="left")
+    out["rel"] = out["mean"] / out["ref"]
+    return out
+
+
+def plot_metric_vs_channels(agg: pd.DataFrame, metric: str, output_path: Path,
+                            algos: list) -> None:
+    """Pomer metriky k Toeplitzu vs pocet DMA kanalov, pre dvojicu algo.
+    2x2: 3 panely (jeden na symetriu) + 4. bunka = legenda.
+    Toeplitz = referencna ciara 1.0; xorhash sa nekresli."""
+    data = _toeplitz_ratio(agg)
+    name = METRIC_NAME.get(metric, metric)
     syms = ["none", "xorfold", "sortfold"]
-    fig, axes = plt.subplots(1, 3, figsize=(16, 5), sharey=True, constrained_layout=True)
 
-    for ax, sym in zip(axes, syms):
-        sub = agg[agg["symmetry"] == sym]
-        for algo, g in sub.groupby("algorithm"):
-            g = g.sort_values("num_channels")
-            ax.plot(g["num_channels"], g["mean"], marker="o", ms=4,
-                    label=algo, color=COLORS.get(algo))
-            ax.fill_between(g["num_channels"], g["mean"] - g["std"], g["mean"] + g["std"],
-                            alpha=0.15, color=COLORS.get(algo))
-        ax.set_title(sym)
-        ax.set_xscale("log", base=2)
-        ax.set_xticks([8, 16, 20, 32, 40, 64, 128])
-        ax.xaxis.set_major_formatter(ScalarFormatter())
-        ax.xaxis.set_minor_locator(plt.NullLocator())
+    fig, axes = plt.subplots(2, 2, figsize=(11, 9), sharey=True, constrained_layout=True)
+
+    rel = data[data["algorithm"].isin(algos)]["rel"].dropna()
+    margin = max(0.02, (rel.max() - rel.min()) * 0.15)
+    lo, hi = min(rel.min(), 1.0) - margin, max(rel.max(), 1.0) + margin
+
+    for ax, sym in zip(axes.flat, syms):
+        sub = data[data["symmetry"] == sym]
+        ax.axhline(1.0, linestyle="--", linewidth=1, color="0.6", zorder=1)
+        for algo in algos:
+            g = sub[sub["algorithm"] == algo].sort_values("num_channels")
+            if g.empty:
+                continue
+            xpos = [CHANNELS.index(c) for c in g["num_channels"]]
+            ax.plot(xpos, g["rel"], marker=MARKERS[algo], markersize=5, linewidth=1.5,
+                    color=COLORS[algo], label=LABELS[algo], zorder=3)
+        ax.set_title(sym, fontsize=10, pad=6)
+        ax.set_xticks(range(len(CHANNELS)))
+        ax.set_xticklabels(CHANNELS)
+        ax.set_ylim(lo, hi)
+        ax.grid(True, axis="y", color="#e1e0d9", linewidth=0.6)
+        ax.set_axisbelow(True)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+    axes[1, 1].axis("off")
+    legend_handles = [plt.Line2D([], [], linestyle="--", color="0.6",
+                                 label="Toeplitz (baseline = 1.0)")]
+    legend_handles += [plt.Line2D([], [], marker=MARKERS[a], color=COLORS[a],
+                                  label=LABELS[a]) for a in algos]
+    axes[1, 1].legend(handles=legend_handles, loc="center", frameon=False)
+
+    for ax in (axes[0, 0], axes[1, 0]):
+        ax.set_ylabel(f"{name} relative to Toeplitz  (×)")
+    for ax in (axes[1, 0], axes[0, 1]):
         ax.set_xlabel("DMA channels")
-        if log_y:
-            ax.set_yscale("log")
 
-    axes[0].set_ylabel("‰ over fair share" if metric == "thresshold_sum" else "normalized χ²")
-    handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="lower center", ncol=6, bbox_to_anchor=(0.5, -0.05))
-    fig.suptitle(metric)
+    fig.suptitle(f"{name}: deviation from Toeplitz across DMA channel counts",
+                 fontsize=13)
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
@@ -127,11 +169,13 @@ def main() :
     results = [aggregate_by_algorithm_run_avg(f, DMA) for f in frames]
     plot_threshold_bar(*results, outdir, DMA)
 
-    # ciary: metrika vs pocet kanalov, jeden panel na symetriu
+    # ciary: pomer metriky k Toeplitzu vs pocet kanalov, jeden panel na symetriu.
+    # dve dvojice algo zvlast - inak je v paneli prilis vela ciar
     combined = pd.concat(frames, ignore_index=True)
     for metric in ("thresshold_sum", "chi"):
         agg = aggregate_over_channels(combined, metric)
-        plot_metric_vs_channels(agg, metric, outdir / f"{metric}_vs_channels.png", log_y=True)
+        plot_metric_vs_channels(agg, metric, outdir / f"{metric}_vs_channels_A.png", GROUP_A)
+        plot_metric_vs_channels(agg, metric, outdir / f"{metric}_vs_channels_B.png", GROUP_B)
 
 if __name__ == "__main__":
     main()
