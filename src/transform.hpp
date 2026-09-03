@@ -17,7 +17,7 @@
 
 #include <array>
 #include <cstdint>
-#include "flow_data.hpp"
+#include "config.hpp"
 
 enum class Symmetry {
     None     = 0,

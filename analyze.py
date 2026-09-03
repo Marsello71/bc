@@ -1,12 +1,17 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+from matplotlib.ticker import ScalarFormatter
 
 from pathlib import Path
 import sys
 
-CRYPTO_ALGOS = {"chaskey", "halfsiphash", "siphash", "jhash"}
-NON_CRYPTO_ALGOS = {"crc32c", "ascon", "spookyhash", "nsgahash4"}
+ALGOS = {"chaskey", "halfsiphash", "crc32c", "jhash"}
+
+COLORS = {
+    "toeplitz": "black", "jhash": "#4C72B0", "chaskey": "#55A868",
+    "halfsiphash": "#C44E52", "crc32c": "#8172B2", "xorhash": "#CCB974",
+}
 
 
 def load_results(csv_path : Path) -> pd.DataFrame:
@@ -16,102 +21,117 @@ def load_results(csv_path : Path) -> pd.DataFrame:
 
 def aggregate_by_algorithm_run_avg(data: pd.DataFrame, DMA: int) -> pd.DataFrame:
     filtered = data[data["num_channels"] == DMA]
+    sym = filtered["symmetry"].iloc[0]   # kazdy vstupny subor = jedna symetria
 
-    # key_value = priemer thresshold_sum cez vsetky okna toho kluca.
-    # thresshold_sum uz je v promile (benchmark.cpp: sum / (WINDOW_SIZE/1000)),
-    # takze priemer cez okna = promile z celkoveho poctu paketov toho behu.
     per_key = filtered.groupby(["algorithm", "key_id"]).agg(
         key_value=("thresshold_sum", "mean"),
     ).reset_index()
 
     rows = []
     for algorithm, group in per_key.groupby("algorithm"):
-        typical_permille = group["key_value"].median()  # typicky kluc
-        worst_permille = group["key_value"].max()        # najhorsi kluc
         rows.append({
+            "symmetry": sym,
             "algorithm": algorithm,
-            "typical_permille": typical_permille,
-            "worst_permille": worst_permille,
+            "typical_permille": group["key_value"].median(),
+            "worst_permille": group["key_value"].max(),
         })
 
     per_algo = pd.DataFrame(rows)
     return per_algo.sort_values("typical_permille")
 
+def aggregate_over_channels(data, metric):
+    per_key = (data.groupby(["symmetry", "algorithm", "num_channels", "key_id"])[metric]
+               .mean().reset_index())
+    return (per_key.groupby(["symmetry", "algorithm", "num_channels"])[metric]
+            .agg(mean="mean", std="std").reset_index())
 
-def plot_algo_grid(data, median_col, worst_col, algos, nrows, ncols, output_path, DMA, y_label) -> None:
 
-    fig, axes = plt.subplots(nrows, ncols, figsize=(12, 8), sharey=True, constrained_layout=True)
-    toeplitz_data = data[(data["algorithm"] == "toeplitz") & (data["num_channels"] == DMA)]
+def plot_threshold_bar(data0, data1, data2, output_dir: Path, DMA):
+    datas = [data0, data1, data2]
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharey=True,
+                             constrained_layout=True)
 
-    for ax, name in zip(axes.flat, algos) :
-        algo_data = data[(data["algorithm"] == name) & (data["num_channels"] == DMA)]
-        ax.plot(toeplitz_data["tuple_run_index"],toeplitz_data[median_col], label="Toeplitz", linestyle = "--", color="black")
-        ax.plot(algo_data["tuple_run_index"],algo_data[worst_col], label="Worst")
-        ax.plot(algo_data["tuple_run_index"],algo_data[median_col], label="Median")
-        ax.set_xlabel("Window index (1 window = 100,000 tuples)")
-        ax.set_title(name)
-        ax.ticklabel_format(axis="y", useOffset=False, style="plain")
+    width = 0.35
+    y_max = max(d[["typical_permille", "worst_permille"]].max().max() for d in datas)
+
+    for ax, d in zip(axes.flat, datas):   # 3 panely, 4. bunka ostava legende
+        x = range(len(d))
+        mc = ["black"   if a == "toeplitz" else "#4C72B0" for a in d["algorithm"]]
+        wc = ["dimgray" if a == "toeplitz" else "#DD8452" for a in d["algorithm"]]
+        bm = ax.bar([i - width/2 for i in x], d["typical_permille"], width, color=mc)
+        bw = ax.bar([i + width/2 for i in x], d["worst_permille"],   width, color=wc)
+        ax.bar_label(bm, fmt="%.2f", padding=2, fontsize=7.5)
+        ax.bar_label(bw, fmt="%.2f", padding=2, fontsize=7.5)
+        ax.set_xticks(list(x)); ax.set_xticklabels(d["algorithm"], rotation=30, ha="right")
+        ax.set_title(d["symmetry"].iloc[0])
+
+    axes[0, 0].set_ylim(0, y_max * 1.15)
+
+    legend_ax = axes[1, 1]
+    legend_ax.axis("off")
+    legend_ax.legend(handles=[
+        Patch(color="#4C72B0", label="Typical key (median over keys)"),
+        Patch(color="#DD8452", label="Worst key (max over keys)"),
+        Patch(color="black",   label="Toeplitz — typical"),
+        Patch(color="dimgray", label="Toeplitz — worst"),
+    ], loc="center", frameon=False)
 
     for ax in axes[:, 0]:
-        ax.set_ylabel(y_label)
-        
-    fig.suptitle(f"{median_col} on {DMA} channels")
+        ax.set_ylabel("Packets over fair share [‰ of total packets]")
 
-    handles, labels = axes.flat[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper right")
-
-    fig.savefig(output_path)
+    fig.suptitle(f"Channel overload: typical vs worst key — {DMA} channels")
+    fig.savefig(output_dir / f"overload_bar_{DMA}.png", dpi=150)
     plt.close(fig)
 
-def plot_threshold_bar(data: pd.DataFrame, output_path: Path, DMA: int) -> None:
-    """
-    2 stlpce na algoritmus: typical_permille (modry) a worst_permille (oranzovy).
-    Toeplitz dostava rovnaku dvojicu stlpcov, ale cierno/sivu farbu (baseline).
-    """
-    fig, ax = plt.subplots(figsize=(10, 5.5), constrained_layout=True)
+def plot_metric_vs_channels(agg, metric, output_path, log_y=False):
+    syms = ["none", "xorfold", "sortfold"]
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5), sharey=True, constrained_layout=True)
 
-    x = range(len(data))
-    width = 0.35
+    for ax, sym in zip(axes, syms):
+        sub = agg[agg["symmetry"] == sym]
+        for algo, g in sub.groupby("algorithm"):
+            g = g.sort_values("num_channels")
+            ax.plot(g["num_channels"], g["mean"], marker="o", ms=4,
+                    label=algo, color=COLORS.get(algo))
+            ax.fill_between(g["num_channels"], g["mean"] - g["std"], g["mean"] + g["std"],
+                            alpha=0.15, color=COLORS.get(algo))
+        ax.set_title(sym)
+        ax.set_xscale("log", base=2)
+        ax.set_xticks([8, 16, 20, 32, 40, 64, 128])
+        ax.xaxis.set_major_formatter(ScalarFormatter())
+        ax.xaxis.set_minor_locator(plt.NullLocator())
+        ax.set_xlabel("DMA channels")
+        if log_y:
+            ax.set_yscale("log")
 
-    median_colors = ["black" if a == "toeplitz" else "#4C72B0" for a in data["algorithm"]]
-    worst_colors = ["dimgray" if a == "toeplitz" else "#DD8452" for a in data["algorithm"]]
-
-    bars_median = ax.bar([i - width / 2 for i in x], data["typical_permille"], width,
-                          label="Typical key (median over keys)", color=median_colors)
-    bars_worst = ax.bar([i + width / 2 for i in x], data["worst_permille"], width,
-                         label="Worst key (max over keys)", color=worst_colors)
-
-    ax.bar_label(bars_median, fmt="%.2f", padding=2, fontsize=7)
-    ax.bar_label(bars_worst, fmt="%.2f", padding=2, fontsize=7)
-
-    ax.set_xticks(list(x))
-    ax.set_xticklabels(data["algorithm"])
-    y_max = max(data["typical_permille"].max(), data["worst_permille"].max())
-    ax.set_ylim(0, y_max * 1.12)
-    ax.set_ylabel("Packets over fair share [‰ of total packets]")
-    ax.set_xlabel("Algorithm")
-    ax.set_title(f"Channel overload: typical key vs. worst key — {DMA} channels")
-
-    handles, labels = ax.get_legend_handles_labels()
-    handles += [
-        Patch(color="black", label="Toeplitz — typical"),
-        Patch(color="dimgray", label="Toeplitz — worst"),
-    ]
-    ax.legend(handles=handles)
-
-    fig.savefig(output_path)
+    axes[0].set_ylabel("‰ over fair share" if metric == "thresshold_sum" else "normalized χ²")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=6, bbox_to_anchor=(0.5, -0.05))
+    fig.suptitle(metric)
+    fig.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
 
 def main() :
-    if len(sys.argv) != 4 : 
-        sys.stderr.write("tu run the analysis main needs 4 argumenst: [dataset] [output_file] [DMA channels]\n")
-    RESULTS_CSV = Path(sys.argv[1])
-    data = load_results(RESULTS_CSV)
-    DMA = int(sys.argv[3])
-    results = aggregate_by_algorithm_run_avg(data, DMA)
+    if len(sys.argv) != 6 :
+        sys.stderr.write("usage: analyze.py <sym0.csv> <sym1.csv> <sym2.csv> <outdir> <DMA>\n")
+        sys.exit(1)
 
-    plot_threshold_bar(results, Path(sys.argv[2] + "overload_comparison.png"), DMA)
+    outdir = Path(sys.argv[4])
+    outdir.mkdir(parents=True, exist_ok=True)
+    DMA = int(sys.argv[5])
+
+    frames = [load_results(Path(p)) for p in sys.argv[1:4]]
+
+    # bar: typicky vs najhorsi kluc, jeden panel na symetriu, fixny DMA
+    results = [aggregate_by_algorithm_run_avg(f, DMA) for f in frames]
+    plot_threshold_bar(*results, outdir, DMA)
+
+    # ciary: metrika vs pocet kanalov, jeden panel na symetriu
+    combined = pd.concat(frames, ignore_index=True)
+    for metric in ("thresshold_sum", "chi"):
+        agg = aggregate_over_channels(combined, metric)
+        plot_metric_vs_channels(agg, metric, outdir / f"{metric}_vs_channels.png", log_y=True)
 
 if __name__ == "__main__":
     main()

@@ -36,4 +36,6 @@ constexpr std::array<int, 7> CHANNEL_COUNTS = {8, 16, 20, 32, 40, 64, 128};
 
 } // namespace config
 
+constexpr std::size_t TUPLE_SIZE = 36;
+
 #endif // CONFIG_HPP
