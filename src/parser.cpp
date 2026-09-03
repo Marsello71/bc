@@ -32,12 +32,7 @@ void ipToBytes16(const std::string& ip_str, uint8_t out[16]) {
     throw std::runtime_error("invalid IP address " + ip_str);
 }
 
-std::array<uint8_t, TUPLE_SIZE> parseLineToTuple(const std::string& line) {
-    std::vector<std::string> fields = splitCsvLine(line);
-    if (fields.size() != 5) {
-        throw std::runtime_error("The row has not 5 fields");
-    }
-
+std::array<uint8_t, TUPLE_SIZE> tuple37(std::vector<std::string> fields) {
     std::array<uint8_t, TUPLE_SIZE> key = {};
     int offset = 0;
 
@@ -59,9 +54,43 @@ std::array<uint8_t, TUPLE_SIZE> parseLineToTuple(const std::string& line) {
     std::memcpy(key.data() + offset, &dst_port, 2);
     offset += 2;
 
-    uint8_t protocol = static_cast<uint8_t>(std::stoi(fields[4]));
-    std::memcpy(key.data() + offset, &protocol, 1);
-
     return key;
 }
+
+std::array<uint8_t, TUPLE_SIZE> tuple34(std::vector<std::string> fields) {
+    std::array<uint8_t, TUPLE_SIZE> key = {};
+    int offset = 0;
+
+    uint8_t src_IP[16];
+    ipToBytes16(fields[0], src_IP);
+    std::memcpy(key.data(), src_IP, 16);
+    offset += 16;
+
+    uint8_t dst_IP[16];
+    ipToBytes16(fields[1], dst_IP);
+    std::memcpy(key.data() + offset, dst_IP, 16);
+    offset += 16;
+
+    uint16_t vlan_id = htons(static_cast<uint16_t>(std::stoi(fields[2])));
+    std::memcpy(key.data() + offset, &vlan_id, 2);
+    offset += 2;
+
+    return key; 
+}
+
+
+std::array<uint8_t, TUPLE_SIZE> parseLineToTuple(const std::string& line) {
+    std::vector<std::string> fields = splitCsvLine(line);
+
+    if (fields.size() == 5) {
+        return tuple37(fields);    
+    } else if( fields.size() == 3) { 
+        return tuple34(fields);    
+    }  else throw std::runtime_error("The row has not correct number of fields");
+
+    return {};
+}
+
+
+
 

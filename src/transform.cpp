@@ -17,7 +17,7 @@ static std::array<uint8_t, TUPLE_SIZE> symmetric_xor(const std::array<uint8_t, T
         xor_key[i] = tuple[i] ^ tuple[i+18];
         xor_key[i+18] = tuple[i] ^ tuple[i+18];
     }
-    xor_key[36] = tuple[36];
+    //xor_key[36] = tuple[36];
     return xor_key;
 } 
 
@@ -33,7 +33,7 @@ static std::array<uint8_t, TUPLE_SIZE> symmetric_sort(const std::array<uint8_t, 
     } else {
         memcpy(&sorted_key[0], &tuple[0], 36);
     }
-    sorted_key[36] = tuple[36];
+    //sorted_key[36] = tuple[36];
 
     return sorted_key;
 }
