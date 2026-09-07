@@ -31,6 +31,6 @@ Symmetry parseSymmetry(const char *arg);
 /// Short lowercase name for CSV / filenames ("none" / "xorfold" / "sortfold").
 const char *symmetryName(Symmetry s);
 
-std::array<uint8_t, TUPLE_SIZE> applySymmetry(Symmetry s, const std::array<uint8_t, TUPLE_SIZE> &in);
+std::array<uint8_t, TUPLE_SIZE> applySymmetry(Symmetry s, const std::array<uint8_t, TUPLE_SIZE> &in, size_t offset);
 
 #endif // TRANSFORM_HPP

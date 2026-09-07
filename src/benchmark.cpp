@@ -41,8 +41,8 @@ std::vector<std::array<uint8_t, config::RSS_KEY_SIZE>> getKeys() {
 
 
 int main(int argc, char* argv[]) {
-    if(argc != 4) {
-    std::cerr << "tu run the analysis main needs 4 argumenst: [dataset] [output_file] [symetri 2/1/0]\n";
+    if(argc != 5) {
+    std::cerr << "tu run the analysis main needs 5 argumenst: [dataset] [output_file] [symetri 2/1/0]\n";
         return 1;
     }
 
@@ -62,6 +62,9 @@ int main(int argc, char* argv[]) {
 
     std::vector<std::array<uint8_t, TUPLE_SIZE>> tuples;
     tuples.reserve(5000000);
+
+    bool short_tuple  = std::atoi(argv[4]);
+    size_t offset = short_tuple ? 16 : 18;
 
     std::string line;
     std::getline(reader, line); // skip CSV header
@@ -89,7 +92,7 @@ int main(int argc, char* argv[]) {
             size_t count = 0;
             for (const auto &tuple : tuples) {
                 count++;
-                auto keyed_tuple = applySymmetry(sym, tuple);
+                auto keyed_tuple = applySymmetry(sym, tuple, offset);
                 uint32_t hash = algo.fn(keyed_tuple.data(), TUPLE_SIZE, keys[i].data());
 
                 for(std::size_t j = 0; j < config::CHANNEL_COUNTS.size(); j++) {
