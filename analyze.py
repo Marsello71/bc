@@ -9,11 +9,8 @@ CHANNELS = [8, 16, 20, 32, 40, 64, 128]
 
 COLORS = {
     "toeplitz": "black", "jhash": "#4C72B0", "chaskey": "#55A868",
-    "halfsiphash": "#C44E52", "xorhash": "#8172B2", "crc32c": "#CCB974",
+    "halfsiphash": "#C44E52", "crc32c": "#CCB974",
 }
-# kreslene ako pomer k Toeplitzu; Toeplitz je referencna ciara 1.0, xorhash sa
-# tu nekresli (ma vlastny "dno" graf / bar chart).
-# rozdelene na dve dvojice - inak je v paneli prilis vela ciar naraz
 GROUP_A = ["chaskey", "halfsiphash"]   # krypto ARX
 GROUP_B = ["crc32c", "jhash"]          # nekrypto
 MARKERS = {"chaskey": "o", "crc32c": "s", "halfsiphash": "^", "jhash": "D"}
@@ -22,6 +19,12 @@ LABELS = {
     "halfsiphash": "HalfSipHash", "jhash": "jhash (lookup3)",
 }
 METRIC_NAME = {"thresshold_sum": "Channel overload", "chi": "Distribution χ²"}
+
+BOX_ALGOS = ["toeplitz", "jhash", "chaskey", "halfsiphash", "crc32c"]
+SYM_ORDER = ["none", "xorfold", "sortfold"]
+SYM_LABELS = {"none": "none", "xorfold": "xor", "sortfold": "sort"}
+SYM_COLORS = {"none": "#4C72B0", "xorfold": "#55A868", "sortfold": "#C44E52"}
+
 
 
 def load_results(csv_path : Path) -> pd.DataFrame:
@@ -150,6 +153,54 @@ def plot_metric_vs_channels(agg: pd.DataFrame, metric: str, output_path: Path,
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
+def aggregate_by_algorithm__for_box_plot(data: pd.DataFrame, DMA: int, metric : str) -> pd.DataFrame:
+    filtered = data[data["num_channels"] == DMA]
+    per_key = (filtered
+           .groupby(["symmetry", "algorithm", "key_id"])[metric]
+           .mean()
+           .reset_index(name="key_mean"))
+
+    return per_key
+
+def plot_metric_boxplot(agg: pd.DataFrame, metric: str, output_path: Path,
+                            algos: list) -> None:
+    fig, ax = plt.subplots(figsize=(14, 7), constrained_layout=True)
+    data, positions, colors = [], [], []
+    for i, algo in enumerate(algos):
+        for off, sym in zip((-0.27, 0.0, 0.27), SYM_ORDER):
+            vals = agg[(agg.algorithm == algo) & (agg.symmetry == sym)]["key_mean"].values
+            data.append(vals)
+            positions.append(i + off)
+            colors.append(SYM_COLORS[sym])
+
+
+    bp = ax.boxplot(data, positions=positions, widths=0.22,
+        whis=(0, 100), showfliers=False, patch_artist=True)
+
+    for patch, c in zip(bp["boxes"], colors):
+        patch.set_facecolor(c)
+        patch.set_alpha(0.8)
+    for m in bp["medians"]: 
+        m.set_color("black")
+
+    ax.set_xticks(range(len(algos)))
+    ax.set_xticklabels(algos)
+    ax.set_xlim(-0.6, len(algos) - 0.4)
+
+    name = METRIC_NAME.get(metric, metric)
+    ax.set_ylabel(f"{name} [‰ of total packets]" if metric == "thresshold_sum" else name)
+    ax.grid(True, axis="y", color="#e1e0d9", linewidth=0.6)
+    ax.set_axisbelow(True)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+    handles = [Patch(facecolor=SYM_COLORS[s], alpha=0.8, label=SYM_LABELS[s])
+           for s in SYM_ORDER]
+    ax.legend(handles=handles, title="symmetry", frameon=False)
+
+    ax.set_title(f"{name}: spread across 16 keys")
+    fig.savefig(output_path,dpi = 150)
+    plt.close(fig)
 
 def main() :
     if len(sys.argv) != 6 :
@@ -174,6 +225,10 @@ def main() :
         plot_metric_vs_channels(agg, metric, outdir / f"{metric}_vs_channels_A.png", GROUP_A)
         plot_metric_vs_channels(agg, metric, outdir / f"{metric}_vs_channels_B.png", GROUP_B)
 
+    for metric in ("thresshold_sum", "chi"):
+        agg = aggregate_by_algorithm__for_box_plot(combined, DMA, metric)
+        plot_metric_boxplot(agg, metric, outdir / f"{metric}_vs_keys_box_{DMA}.png",BOX_ALGOS)
+        
 if __name__ == "__main__":
     main()
 
