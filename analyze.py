@@ -104,9 +104,6 @@ def _toeplitz_ratio(agg: pd.DataFrame) -> pd.DataFrame:
 
 def plot_metric_vs_channels(agg: pd.DataFrame, metric: str, output_path: Path,
                             algos: list) -> None:
-    """Pomer metriky k Toeplitzu vs pocet DMA kanalov, pre dvojicu algo.
-    2x2: 3 panely (jeden na symetriu) + 4. bunka = legenda.
-    Toeplitz = referencna ciara 1.0; xorhash sa nekresli."""
     data = _toeplitz_ratio(agg)
     name = METRIC_NAME.get(metric, metric)
     syms = ["none", "xorfold", "sortfold"]
