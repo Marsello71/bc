@@ -3,24 +3,25 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
 from pathlib import Path
+from matplotlib.colors import to_rgba
 import sys
 
 CHANNELS = [8, 16, 20, 32, 40, 64, 128]
 
 COLORS = {
     "toeplitz": "black", "jhash": "#4C72B0", "chaskey": "#55A868",
-    "halfsiphash": "#C44E52", "crc32c": "#CCB974",
+    "halfsiphash": "#C44E52", "multiplyshift": "#CCB974",
 }
 GROUP_A = ["chaskey", "halfsiphash"]   # krypto ARX
-GROUP_B = ["crc32c", "jhash"]          # nekrypto
-MARKERS = {"chaskey": "o", "crc32c": "s", "halfsiphash": "^", "jhash": "D"}
+GROUP_B = ["multiplyshift", "jhash"]   # nekrypto
+MARKERS = {"chaskey": "o", "multiplyshift": "s", "halfsiphash": "^", "jhash": "D"}
 LABELS = {
-    "chaskey": "Chaskey", "crc32c": "CRC32C",
+    "chaskey": "Chaskey", "multiplyshift": "multiply-shift (NH)",
     "halfsiphash": "HalfSipHash", "jhash": "jhash (lookup3)",
 }
 METRIC_NAME = {"thresshold_sum": "Channel overload", "chi": "Distribution χ²"}
 
-BOX_ALGOS = ["toeplitz", "jhash", "chaskey", "halfsiphash", "crc32c"]
+BOX_ALGOS = ["toeplitz", "jhash", "chaskey", "halfsiphash", "multiplyshift"]
 SYM_ORDER = ["none", "xorfold", "sortfold"]
 SYM_LABELS = {"none": "none", "xorfold": "xor", "sortfold": "sort"}
 SYM_COLORS = {"none": "#4C72B0", "xorfold": "#55A868", "sortfold": "#C44E52"}
@@ -162,45 +163,67 @@ def aggregate_by_algorithm__for_box_plot(data: pd.DataFrame, DMA: int, metric : 
 
     return per_key
 
-def plot_metric_boxplot(agg: pd.DataFrame, metric: str, output_path: Path,
-                            algos: list) -> None:
-    fig, ax = plt.subplots(figsize=(14, 7), constrained_layout=True)
-    data, positions, colors = [], [], []
-    for i, algo in enumerate(algos):
-        for off, sym in zip((-0.27, 0.0, 0.27), SYM_ORDER):
-            vals = agg[(agg.algorithm == algo) & (agg.symmetry == sym)]["key_mean"].values
-            data.append(vals)
-            positions.append(i + off)
-            colors.append(SYM_COLORS[sym])
-
-
-    bp = ax.boxplot(data, positions=positions, widths=0.22,
-        whis=(0, 100), showfliers=False, patch_artist=True)
-
-    for patch, c in zip(bp["boxes"], colors):
-        patch.set_facecolor(c)
-        patch.set_alpha(0.8)
-    for m in bp["medians"]: 
-        m.set_color("black")
-
-    ax.set_xticks(range(len(algos)))
-    ax.set_xticklabels(algos)
-    ax.set_xlim(-0.6, len(algos) - 0.4)
-
+def plot_metric_boxplot(agg, metric, output_path, algos, DMA):
+    fig, axes = plt.subplots(2, 2, figsize=(13, 10), constrained_layout=True)
     name = METRIC_NAME.get(metric, metric)
-    ax.set_ylabel(f"{name} [‰ of total packets]" if metric == "thresshold_sum" else name)
-    ax.grid(True, axis="y", color="#e1e0d9", linewidth=0.6)
-    ax.set_axisbelow(True)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
+    unit = " [‰ of total packets]" if metric == "thresshold_sum" else ""
+    n_keys = agg["key_id"].nunique()
 
-    handles = [Patch(facecolor=SYM_COLORS[s], alpha=0.8, label=SYM_LABELS[s])
-           for s in SYM_ORDER]
-    ax.legend(handles=handles, title="symmetry", frameon=False)
+    for ax, sym in zip(axes.flat, SYM_ORDER):
+        sub = agg[agg["symmetry"] == sym]
+        data = [sub.loc[sub["algorithm"] == a, "key_mean"].values for a in algos]
 
-    ax.set_title(f"{name}: spread across 16 keys")
-    fig.savefig(output_path,dpi = 150)
+        bp = ax.boxplot(
+            data,
+            widths=0.35,
+            whis=(0, 100),
+            showfliers=False,
+            patch_artist=True,
+            medianprops=dict(color="black", linewidth=1.6),
+            whiskerprops=dict(color="0.4", linewidth=1.0),
+            capprops=dict(color="0.4", linewidth=1.0),
+        )
+        for patch, a in zip(bp["boxes"], algos):
+            patch.set_facecolor(to_rgba(COLORS[a], 0.35))
+            patch.set_edgecolor(COLORS[a])
+            patch.set_linewidth(1.4)
+
+        for i, med in enumerate(bp["medians"]):
+            ax.plot(i + 1, med.get_ydata()[0], marker="D", color="black",
+                    markersize=5, zorder=5)
+
+        ax.set_title(SYM_LABELS[sym], fontsize=12, fontweight="bold")
+        ax.set_xticks(range(1, len(algos) + 1))
+        ax.set_xticklabels(algos, rotation=25, ha="right")
+        ax.set_ylabel(f"{name}{unit}")
+        ax.grid(True, axis="y", color="#e1e0d9", linewidth=0.6)
+        ax.set_axisbelow(True)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.margins(y=0.12)
+
+    lax = axes.flat[3]                       # 4. bunka = legenda + vysvetlivka
+    lax.axis("off")
+    handles = [Patch(facecolor=to_rgba(COLORS[a], 0.35), edgecolor=COLORS[a],
+                     linewidth=1.4, label=a) for a in algos]
+    handles.append(plt.Line2D([], [], marker="D", color="black", linestyle="none",
+                              markersize=5, label="median"))
+    lax.legend(handles=handles, title="Algorithm", frameon=False,
+               loc="upper center", fontsize=10)
+    lax.text(0.5, 0.44,
+             "box  =  25th–75th percentile across keys\n"
+             "whiskers  =  best and worst key\n"
+             "diamond / line  =  median\n"
+             f"each box summarises {n_keys} RSS keys\n"
+             "note: every panel has its own Y scale",
+             transform=lax.transAxes, ha="center", va="top",
+             fontsize=9, color="0.35")
+
+    fig.suptitle(f"{name}: per-key spread by algorithm — {DMA} DMA channels",
+                 fontsize=14, fontweight="bold")
+    fig.savefig(output_path, dpi=150)
     plt.close(fig)
+
 
 def main() :
     if len(sys.argv) != 6 :
@@ -225,9 +248,11 @@ def main() :
         plot_metric_vs_channels(agg, metric, outdir / f"{metric}_vs_channels_A.png", GROUP_A)
         plot_metric_vs_channels(agg, metric, outdir / f"{metric}_vs_channels_B.png", GROUP_B)
 
-    for metric in ("thresshold_sum", "chi"):
-        agg = aggregate_by_algorithm__for_box_plot(combined, DMA, metric)
-        plot_metric_boxplot(agg, metric, outdir / f"{metric}_vs_keys_box_{DMA}.png",BOX_ALGOS)
+    for dma in (8, 40, 128) :
+        for metric in ("thresshold_sum", "chi"):
+            agg = aggregate_by_algorithm__for_box_plot(combined, DMA, metric)
+            plot_metric_boxplot(agg, metric, outdir / f"{metric}_boxplot_{DMA}.png",
+                                BOX_ALGOS, dma)
         
 if __name__ == "__main__":
     main()
