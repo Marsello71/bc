@@ -14,7 +14,7 @@
 #include "jhash_rss.h"
 #include "toeplitz_rss.h"
 //#include "xorhash_rss.h"
-#include "crc32c_rss.h"
+#include "multiplyshift_rss.h"
 
 using RssHashFunction  = uint32_t (*)(const uint8_t *, size_t, const uint8_t *);
 
