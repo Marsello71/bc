@@ -4,6 +4,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <sstream>
+#include <ctime> 
 
 std::vector<std::string> splitCsvLine(const std::string& line) {
     std::vector<std::string> out;
@@ -83,12 +84,46 @@ std::array<uint8_t, TUPLE_SIZE> parseLineToTuple(const std::string& line) {
     std::vector<std::string> fields = splitCsvLine(line);
 
     if (fields.size() == 5) {
-        return tuple37(fields);    
-    } else if( fields.size() == 3) { 
-        return tuple34(fields);    
+        return tuple37(fields);
+    } else if( fields.size() == 3) {
+        return tuple34(fields);
     }  else throw std::runtime_error("The row has not correct number of fields");
 
     return {};
+}
+
+
+// "YYYY-MM-DD HH:MM:SS.fffffffff" -> seconds of day (as double, keeps the 9-digit
+// fraction). Downstream only needs differences and ordering, so the date is
+// dropped - assumes the whole dataset is within one day.
+static double parseFlowTimestamp(const std::string& ts) {
+    size_t sp = ts.find(' ');
+    std::string t = ts.substr(sp + 1);          // "HH:MM:SS.fffffffff"
+    int hh = std::stoi(t.substr(0, 2));
+    int mm = std::stoi(t.substr(3, 2));
+    double ss = std::stod(t.substr(6));         // "SS.fffffffff"
+    return hh * 3600.0 + mm * 60.0 + ss;
+}
+
+// Column order:
+//   0 flowstart  1 flowend  2 srcip  3 srcport  4 dstip  5 dstport
+//   6 protocol   7 bytes    8 packets  9 bytes_rev  10 packets_rev
+FlowRow parseFlowLine(const std::string& line) {
+    std::vector<std::string> f = splitCsvLine(line);
+    if (f.size() != 11) {
+        throw std::runtime_error("flow row does not have 11 fields");
+    }
+    FlowRow row;
+    row.t_start     = parseFlowTimestamp(f[0]);
+    row.t_end       = parseFlowTimestamp(f[1]);
+    if (row.t_end < row.t_start) row.t_end = row.t_start;   // midnight wrap / bad data -> instant flow
+    row.fwd         = tuple37({ f[2], f[3], f[4], f[5], f[6] });   // src -> dst
+    row.rev         = tuple37({ f[4], f[5], f[2], f[3], f[6] });   // dst -> src (swapped for the reverse packets)
+    row.bytes_fwd   = std::stoll(f[7]);
+    row.packets_fwd = std::stoll(f[8]);
+    row.bytes_rev   = std::stoll(f[9]);
+    row.packets_rev = std::stoll(f[10]);
+    return row;
 }
 
 

@@ -34,5 +34,32 @@ void ipToBytes16(const std::string& ip_str, uint8_t out[16]);
  */
 std::array<uint8_t, TUPLE_SIZE> parseLineToTuple(const std::string& line);
 
+
+/**
+ * One parsed row of the 11-field flow CSV:
+ *   flowstart,flowend,srcip,srcport,dstip,dstport,protocol,bytes,packets,bytes_rev,packets_rev
+ *
+ * `t_start` / `t_end` are seconds (any fixed origin is fine - only differences
+ * and ordering are used downstream). `fwd` is the src->dst tuple in the same
+ * layout as parseLineToTuple; `rev` is the dst->src tuple. `*_rev` counts are
+ * zero when the flow is unidirectional.
+ */
+struct FlowRow {
+    double  t_start;
+    double  t_end;
+    std::array<uint8_t, TUPLE_SIZE> fwd;
+    std::array<uint8_t, TUPLE_SIZE> rev;
+    int64_t packets_fwd;
+    int64_t bytes_fwd;
+    int64_t packets_rev;
+    int64_t bytes_rev;
+};
+
+/**
+ * Parse one 11-field flow CSV line into a FlowRow.
+ * @throws std::runtime_error on a wrong field count or unparseable field
+ */
+FlowRow parseFlowLine(const std::string& line);
+
 #endif // PARSER_HPP
 

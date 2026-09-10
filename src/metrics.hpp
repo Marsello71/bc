@@ -10,7 +10,11 @@
 #ifndef METRICS_HPP
 #define METRICS_HPP
 
+#include <cstdint>
 #include <vector>
+
+// Histogram entries are int64_t: with "byte" weighting a channel's running
+// total in one 150k-packet window can exceed 2^31.
 
 /**
  * Jain's fairness index:  (Σx)² / (n · Σx²).
@@ -18,7 +22,7 @@
  * Higher is better.  Ignores @p window_packets and @p channels (uses hist.size()).
  * Source: benchmark.cpp computeFairness (fix: take hist by const ref, not by value).
  */
-double computeFairness(const std::vector<int>& hist, long window_packets, int channels);
+double computeFairness(const std::vector<int64_t>& hist, long window_packets, int channels);
 
 /**
  * Normalised Pearson χ²:  ( Σ (xᵢ − e)² / e ) / window_packets ,  e = window_packets / n.
@@ -26,7 +30,7 @@ double computeFairness(const std::vector<int>& hist, long window_packets, int ch
  * This is the metric that separates hash functions on low-entropy input.
  * Source: benchmark.cpp computeChi.
  */
-double computeChi(const std::vector<int>& hist, long window_packets, int channels);
+double computeChi(const std::vector<int64_t>& hist, long window_packets, int channels);
 
 /*
  * Total packets above the fair share, summed over overloaded channels,
@@ -37,6 +41,6 @@ double computeChi(const std::vector<int>& hist, long window_packets, int channel
  * Source: benchmark.cpp computeOverThressholdSum. NOTE: the original divides by the
  * global WINDOW_SIZE; here divide by @p window_packets (same value, no global).
  */
-double computeOverThreshold(const std::vector<int>& hist, long window_packets, int channels);
+double computeOverThreshold(const std::vector<int64_t>& hist, long window_packets, int channels);
 
 #endif // METRICS_HPP

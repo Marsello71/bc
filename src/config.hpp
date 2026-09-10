@@ -23,6 +23,7 @@ constexpr uint32_t KEY_SEED = 65536;
 
 /// Number of packets per measurement window. Each window produces one CSV row
 /// per (algorithm, key_id, num_channels). The last partial window is dropped.
+/// 150k packets ~= 10 ms of a saturated 100 GbE link 
 constexpr uint32_t WINDOW_SIZE = 150000;
 
 /// How many independent random keys each keyed hash is evaluated with.
