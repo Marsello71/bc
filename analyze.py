@@ -26,6 +26,22 @@ SYM_ORDER = ["none", "xorfold", "sortfold"]
 SYM_LABELS = {"none": "none", "xorfold": "xor", "sortfold": "sort"}
 SYM_COLORS = {"none": "#4C72B0", "xorfold": "#55A868", "sortfold": "#C44E52"}
 
+# results now carry a `weighting` column: how channel load was counted.
+#   flow   - one unit per flow direction (simple-tuple-equivalent)
+#   packet - one unit per packet (flow expanded to real packet count)
+#   byte   - packet size in bytes
+WEIGHT_ORDER = ["flow", "packet", "byte"]
+WEIGHT_LABELS = {"flow": "per flow", "packet": "per packet", "byte": "per byte"}
+
+# TODO(marcel): the headline comparison plot.
+#   Same metric, one line/box per weighting, so the shrink of the
+#   algorithm/key spread going flow -> packet -> byte is visible.
+#   Existing aggregation fns already group by "symmetry" - add "weighting"
+#   to their groupby lists (or pre-filter `data` to one weighting) and reuse
+#   plot_metric_vs_channels / plot_metric_boxplot per weighting.
+#   Old 3-arg CLI won't fit 9 files (3 sym x 3 weighting) - either glob the
+#   results dir or take the dir as one arg.
+
 
 
 def load_results(csv_path : Path) -> pd.DataFrame:
@@ -184,7 +200,7 @@ def plot_metric_boxplot(agg, metric, output_path, algos, DMA):
             capprops=dict(color="0.4", linewidth=1.0),
         )
         for patch, a in zip(bp["boxes"], algos):
-            patch.set_facecolor(to_rgba(COLORS[a], 0.35))
+            patch.set_facecolor(to_rgba(COLORS[a], 0.40))
             patch.set_edgecolor(COLORS[a])
             patch.set_linewidth(1.4)
 

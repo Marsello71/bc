@@ -20,7 +20,8 @@
 /// One CSV row = one window of one run at one channel count.
 struct ResultRow {
     std::string          algorithm;
-    Symmetry             symmetry;        
+    Symmetry             symmetry;
+    std::string          weighting;
     long                 window_index;
     int                  key_id;
     int                  num_channels;

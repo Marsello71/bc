@@ -9,13 +9,14 @@
 
 // Column order == ResultRow field order. Header and write() must stay in lockstep.
 ResultsWriter::ResultsWriter(std::ostream& os) : outstream(os) {
-    outstream << "algorithm,symmetry,tuple_run_index,key_id,num_channels,"
+    outstream << "algorithm,symmetry,weighting,tuple_run_index,key_id,num_channels,"
                  "thresshold_sum,fairness,chi\n";
 }
 
 void ResultsWriter::write(const ResultRow& row) {
     outstream << row.algorithm            << ','
               << symmetryName(row.symmetry) << ','
+              << row.weighting             << ','
               << row.window_index          << ','
               << row.key_id                << ','
               << row.num_channels          << ','
