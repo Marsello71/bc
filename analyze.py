@@ -33,21 +33,19 @@ SYM_COLORS = {"none": "#4C72B0", "xorfold": "#55A868", "sortfold": "#C44E52"}
 WEIGHT_ORDER = ["flow", "packet", "byte"]
 WEIGHT_LABELS = {"flow": "per flow", "packet": "per packet", "byte": "per byte"}
 
-# TODO(marcel): the headline comparison plot.
-#   Same metric, one line/box per weighting, so the shrink of the
-#   algorithm/key spread going flow -> packet -> byte is visible.
-#   Existing aggregation fns already group by "symmetry" - add "weighting"
-#   to their groupby lists (or pre-filter `data` to one weighting) and reuse
-#   plot_metric_vs_channels / plot_metric_boxplot per weighting.
-#   Old 3-arg CLI won't fit 9 files (3 sym x 3 weighting) - either glob the
-#   results dir or take the dir as one arg.
-
-
-
-def load_results(csv_path : Path) -> pd.DataFrame:
-    if not csv_path.exists() : 
-        raise FileNotFoundError("missing file with results")
-    return pd.read_csv(csv_path)
+def load_results(results_dir :Path) -> pd.DataFrame:
+    files = sorted(results_dir.glob("run_sym*.csv"))
+    if not files:
+        raise FileNotFoundError(f"Nenašiel som 'run_sym*.csv' v {results_dir}")
+    frames = []
+    for f in files : 
+        frame = pd.read_csv(f)
+        if frame.empty:
+            continue
+        if "weighting" not in frame.columns:
+            frame["weighting"] = "flow"
+        frames.append(frame)
+    return pd.concat(frames, ignore_index=True)
 
 def aggregate_by_algorithm_run_avg(data: pd.DataFrame, DMA: int) -> pd.DataFrame:
     filtered = data[data["num_channels"] == DMA]
@@ -240,19 +238,73 @@ def plot_metric_boxplot(agg, metric, output_path, algos, DMA):
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
 
+def aggregate_by_algorithm__for_box_plot_run(data: pd.DataFrame, DMA: int, metric : str) -> pd.DataFrame:
+    filtered = data[data["num_channels"] == DMA]
+
+    per_key = (filtered
+        .groupby(["weighting","symmetry","algorithm","key_id"])[metric]
+        .mean()
+        .reset_index(name="key_mean"))
+    
+    per_algo = (per_key
+        .groupby(["weighting","symmetry","algorithm"])["key_mean"]
+        .agg(["mean","max"])
+        .reset_index())
+
+    return per_algo
+
+def plot_weighting_comparison(combined_all : pd.DataFrame, metric : str, DMA : int,
+                              output : Path):
+    agg = aggregate_by_algorithm__for_box_plot_run(combined_all, DMA, metric)
+    name = METRIC_NAME.get(metric, metric)
+
+    fig, axes = plt.subplots(2, 2, figsize=(11, 9), sharey=True, constrained_layout=True)
+
+    for ax, sym in zip(axes.flat, SYM_ORDER):
+        sub = agg[agg["symmetry"] == sym]
+        for algo in BOX_ALGOS:
+            g = sub[sub["algorithm"] == algo]
+            xy = [(i, g.loc[g["weighting"] == w, "mean"].values[0])
+                  for i, w in enumerate(WEIGHT_ORDER)
+                  if (g["weighting"] == w).any()]
+            if not xy:
+                continue
+            xs, ys = zip(*xy)
+            ax.plot(xs, ys, marker=MARKERS.get(algo, "o"), color=COLORS[algo],
+                    label=LABELS.get(algo, algo), linewidth=1.5)
+
+        ax.set_xticks(range(3))
+        ax.set_xticklabels([WEIGHT_LABELS[w] for w in WEIGHT_ORDER])
+        ax.set_title(sym)
+
+    axes[1, 1].axis("off")
+    legend_handles = [plt.Line2D([], [], marker=MARKERS.get(a, "o"), color=COLORS[a],
+                                 label=LABELS.get(a, a)) for a in BOX_ALGOS]
+    axes[1, 1].legend(handles=legend_handles, loc="center", frameon=False)
+
+    fig.suptitle(f"{name}: vplyv váhy na rozptyl medzi algoritmami — {DMA} kanálov")
+    fig.savefig(output, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
 
 def main() :
-    if len(sys.argv) != 6 :
-        sys.stderr.write("usage: analyze.py <sym0.csv> <sym1.csv> <sym2.csv> <outdir> <DMA>\n")
+    if len(sys.argv) != 4 :
+        sys.stderr.write("usage: analyze.py <results_dir> <outdir> <DMA>\n")
         sys.exit(1)
 
-    outdir = Path(sys.argv[4])
+    outdir = Path(sys.argv[2])
     outdir.mkdir(parents=True, exist_ok=True)
-    DMA = int(sys.argv[5])
+    DMA = int(sys.argv[3])
 
-    frames = [load_results(Path(p)) for p in sys.argv[1:4]]
+    results_dir = Path(sys.argv[1])
+    if not results_dir.exists() : 
+        raise FileNotFoundError("missing directory with results")
 
-    # bar: typicky vs najhorsi kluc, jeden panel na symetriu, fixny DMA
+    combined_all = load_results(results_dir)
+    main_df = combined_all[combined_all["weighting"] == "flow"]
+    frames  = [main_df[main_df["symmetry"] == s] for s in SYM_ORDER]
+
     results = [aggregate_by_algorithm_run_avg(f, DMA) for f in frames]
     plot_threshold_bar(*results, outdir, DMA)
 
@@ -269,28 +321,10 @@ def main() :
             agg = aggregate_by_algorithm__for_box_plot(combined, DMA, metric)
             plot_metric_boxplot(agg, metric, outdir / f"{metric}_boxplot_{DMA}.png",
                                 BOX_ALGOS, dma)
+    for metric in ("thresshold_sum", "chi"):
+        plot_weighting_comparison(combined_all, metric, DMA,
+                              outdir / f"{metric}_weighting_cmp_{DMA}.png")
+
         
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
