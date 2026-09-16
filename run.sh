@@ -2,7 +2,6 @@
 set -e
 
 DATA="${1:-data/odid1.csv}"   # vstupny dataset (11 stlpcov = flow CSV, 3/5 = simple tuple)
-DMA="${2:-8}"                 # pocet kanalov pre grafy s fixnym DMA
 
 echo "building"
 make
@@ -30,5 +29,4 @@ make clean || true
 echo "running python program"
 source venv/bin/activate
 
-echo "DMA=$DMA"
-python analyze.py results/ results/ "$DMA"
+python analyze.py results/ results/
