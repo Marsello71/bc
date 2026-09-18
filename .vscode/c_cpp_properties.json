@@ -1,0 +1,11 @@
+{
+    "version": 4,
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": ["${workspaceFolder}/src", "${workspaceFolder}/external"],
+            "cStandard": "c17",
+            "cppStandard": "c++17"
+        }
+    ]
+}

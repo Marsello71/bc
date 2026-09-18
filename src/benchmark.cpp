@@ -29,6 +29,7 @@
 #include "transform.hpp"
 #include "metrics.hpp"
 #include "flow_expand.hpp"
+#include "reta.hpp"
 
 std::vector<std::array<uint8_t, config::RSS_KEY_SIZE>> getKeys() {
     std::vector<std::array<uint8_t, config::RSS_KEY_SIZE>>  keys;
@@ -112,8 +113,12 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
     const std::size_t NK = config::NUM_KEYS;
     const std::size_t NC = config::CHANNEL_COUNTS.size();
 
-    // histograms[algo][key][channel-count] -> one bucket per channel.
-    // the innermost length differs per channel-count, so size them in the loop.
+#if RETA_ON
+
+    std::vector<int64_t> buckets(NA * NK * RETA_SIZE, 0);
+    std::vector<int64_t> chan;
+    chan.reserve(static_cast<std::size_t>(CC.back()));
+#else
     using Hist = std::vector<int64_t>;
     std::vector<std::vector<std::vector<Hist>>> histograms(NA, std::vector<std::vector<Hist>>(NK, std::vector<Hist>(NC)));
 
@@ -121,6 +126,7 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
         for (std::size_t k = 0; k < NK; k++)
             for (std::size_t c = 0; c < NC; c++)
                 histograms[a][k][c].assign(CC[c], 0);
+#endif
 
     int64_t packet_count = 0;
     int64_t window_sum_total = 0;   // sum of weights in the current window (metric denominator)
@@ -136,15 +142,50 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
         for (std::size_t a = 0; a < NA; ++a) {
             for (std::size_t k = 0; k < NK; ++k) {
                 uint32_t h = hash_functions_arr[a].fn(tuple.data(), TUPLE_SIZE, keys[k].data());
+#if RETA_ON
+                // one increment, no division - the channel counts come later
+                buckets[(a * NK + k) * RETA_SIZE + (h & (RETA_SIZE - 1))] += weight;
+#else
                 for (std::size_t c = 0; c < NC; ++c) {
                     histograms[a][k][c][h % CC[c]] += weight;
                 }
+#endif
             }
         }
 
         // window full -> one CSV row per (algo, key, channel-count), then reset
         if (packet_count % config::WINDOW_SIZE == 0) {
             window_index++;
+#if RETA_ON
+            for (std::size_t a = 0; a < NA; ++a) {
+                for (std::size_t k = 0; k < NK; ++k) {
+                    const std::size_t base = (a * NK + k) * RETA_SIZE;
+
+                    // fold the RETA entries of this (algo, key) into channel loads:
+                    // every entry adds its weight to the channel the table points at
+                    for (std::size_t c = 0; c < NC; ++c) {
+                        int n = CC[c];
+                        chan.assign(static_cast<std::size_t>(n), 0);
+                        for (std::size_t i = 0; i < RETA_SIZE; ++i)
+                            chan[RETAS[c][i]] += buckets[base + i];
+
+                        ResultRow row{
+                            hash_functions_arr[a].name, sym, weightingName(weighting),
+                            window_index,
+                            (int)k,
+                            n,
+                            computeOverThreshold(chan, window_sum_total, n),
+                            computeFairness    (chan, window_sum_total, n),
+                            computeChi         (chan, window_sum_total, n)
+                        };
+                        writer.write(row);
+                    }
+
+                    // only now, once every channel count has been folded out of them
+                    std::fill(buckets.begin() + base, buckets.begin() + base + RETA_SIZE, 0);
+                }
+            }
+#else
             for (std::size_t a = 0; a < NA; ++a) {
                 for (std::size_t k = 0; k < NK; ++k) {
                     for (std::size_t c = 0; c < NC; ++c) {
@@ -163,6 +204,7 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
                     }
                 }
             }
+#endif
             window_sum_total = 0;
         }
     };
