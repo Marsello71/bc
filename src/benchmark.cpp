@@ -128,26 +128,71 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
                 histograms[a][k][c].assign(CC[c], 0);
 #endif
 
+    // ---- per flow direction state -------------------------------------------
+    // Every packet of a direction has the same tuple, so its NA*NK hashes are
+    // computed once here and only looked up per packet. Slots are recycled when
+    // a direction ends, so this stays at the high-water mark of concurrent
+    // directions (~800k on the full dataset), not one slot per flow in the file.
+    const std::size_t PER_FLOW = NA * NK;        // one value per (algo, key)
+#if RETA_ON
+    std::vector<uint8_t>  flow_slots;            // RETA entry index, fits in a byte
+#else
+    std::vector<uint32_t> flow_slots;            // raw hash, the % CC[c] stays per packet
+#endif
+    std::vector<FlowToken> free_slots;
+    FlowToken next_slot = 0;
+
+    FlowPrepare prepare = [&](const std::array<uint8_t, TUPLE_SIZE> &tuple) -> FlowToken {
+        FlowToken tok;
+        if (!free_slots.empty()) {
+            tok = free_slots.back();
+            free_slots.pop_back();
+        } else {
+            tok = next_slot++;
+            flow_slots.resize(static_cast<std::size_t>(next_slot) * PER_FLOW);
+        }
+        const std::size_t base = static_cast<std::size_t>(tok) * PER_FLOW;
+
+        // the only place a hash is computed now - once per flow direction
+        for (std::size_t a = 0; a < NA; ++a) {
+            for (std::size_t k = 0; k < NK; ++k) {
+                uint32_t h = hash_functions_arr[a].fn(tuple.data(), TUPLE_SIZE, keys[k].data());
+#if RETA_ON
+                flow_slots[base + a * NK + k] = static_cast<uint8_t>(h & (RETA_SIZE - 1));
+#else
+                flow_slots[base + a * NK + k] = h;
+#endif
+            }
+        }
+
+        return tok;
+    };
+
+    FlowRelease release = [&](FlowToken tok) { free_slots.push_back(tok); };
+    // -------------------------------------------------------------------------
+
     int64_t packet_count = 0;
     int64_t window_sum_total = 0;   // sum of weights in the current window (metric denominator)
     long    window_index = 0;
 
     // runs for every packet flow_expand produces, in time order. this lambda is
     // effectively the inner loop body - flow_expand is the "for each packet" around it.
-    PacketSink sink = [&](const std::array<uint8_t, TUPLE_SIZE> &tuple, int64_t weight) {
+    PacketSink sink = [&](FlowToken token, int64_t weight) {
         packet_count++;
         window_sum_total += weight;
 
-        // hash this one packet with every algo+key, drop it in the right channel
+        const std::size_t base = static_cast<std::size_t>(token) * PER_FLOW;
+
+        // no hashing here any more - just count the packet into the bucket its
+        // direction was mapped to when it went live
         for (std::size_t a = 0; a < NA; ++a) {
             for (std::size_t k = 0; k < NK; ++k) {
-                uint32_t h = hash_functions_arr[a].fn(tuple.data(), TUPLE_SIZE, keys[k].data());
+                const auto v = flow_slots[base + a * NK + k];
 #if RETA_ON
-                // one increment, no division - the channel counts come later
-                buckets[(a * NK + k) * RETA_SIZE + (h & (RETA_SIZE - 1))] += weight;
+                buckets[(a * NK + k) * RETA_SIZE + v] += weight;
 #else
                 for (std::size_t c = 0; c < NC; ++c) {
-                    histograms[a][k][c][h % CC[c]] += weight;
+                    histograms[a][k][c][v % CC[c]] += weight;
                 }
 #endif
             }
@@ -209,8 +254,10 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
         }
     };
 
-    expandInterleaved(reader, sym, offset, weighting, sink);
-    std::cout << "Streamed " << packet_count << " packets, " << window_index << " full windows.\n";
+    expandInterleaved(reader, sym, offset, weighting, prepare, sink, release);
+    std::cout << "Streamed " << packet_count << " packets, " << window_index << " full windows, "
+              << next_slot << " flow slots (" << (next_slot * PER_FLOW * sizeof(flow_slots[0])) / (1024 * 1024)
+              << " MB).\n";
 }
 
 // number of comma-separated fields in a CSV line (commas inside quotes don't count)
