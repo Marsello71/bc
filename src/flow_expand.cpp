@@ -34,9 +34,11 @@ const char *weightingName(Weighting w) {
 
 namespace {
 
-// one direction of one flow that is currently "live" in the merge heap
+// one direction of one flow that is currently "live" in the merge heap.
+// it carries only the caller's token, not the tuple - the heap moves entries
+// around on every push/pop, so the less each one weighs the better.
 struct ActiveFlow {
-    std::array<uint8_t, TUPLE_SIZE> tuple;  // not symmetrised yet
+    FlowToken token;
     double  t_start;
     double  t_end;
     int64_t packets_total;                  // how many packets this direction has in total
@@ -68,23 +70,19 @@ int64_t packetWeight(const ActiveFlow &f, Weighting w) {
 } // namespace
 
 void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
-                       Weighting weighting, const PacketSink &sink) {
-    // one heap for the whole file. it holds one entry per currently-active flow
-    // direction (started, but not all its packets sent yet). min-heap, so top()
-    // is always the packet that happens next in time.
+                       Weighting weighting, const FlowPrepare &prepare,
+                       const PacketSink &sink, const FlowRelease &release) {
     std::priority_queue<ActiveFlow, std::vector<ActiveFlow>, std::greater<ActiveFlow>> heap;
 
-    // pull the earliest packet, hand it to the sink, then put its flow back with
-    // the time of its next packet. calling this over and over = packets come out
-    // in time order, interleaved across every active flow.
     auto emitTop = [&]() {
         ActiveFlow af = heap.top(); heap.pop();            // copy + pop: top() can't be edited in place
-        auto keyed = applySymmetry(sym, af.tuple, offset); // once per packet, doesn't depend on algo/key
-        sink(keyed, packetWeight(af, weighting));
+        sink(af.token, packetWeight(af, weighting));
         af.emitted++;
         if (af.emitted < af.packets_total) {              // still has packets -> put it back
             af.next_time = packetTime(af, af.emitted);
             heap.push(af);
+        } else {
+            release(af.token);                            // done: the slot can be reused
         }
     };
 
@@ -103,10 +101,13 @@ void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
         // before we add the new flow, emit everything queued that happens before it starts
         while (!heap.empty() && heap.top().next_time <= r.t_start) emitTop();
 
+        // symmetry and hashing happen once here, not once per packet
+
         // forward direction (Flow weighting collapses it to a single packet)
         int64_t pf = (weighting == Weighting::Flow) ? 1 : r.packets_fwd;
         if (pf > 0) {
-            ActiveFlow a{ r.fwd, r.t_start, r.t_end, pf, r.bytes_fwd, 0, r.t_start };
+            FlowToken tok = prepare(applySymmetry(sym, r.fwd, offset));
+            ActiveFlow a{ tok, r.t_start, r.t_end, pf, r.bytes_fwd, 0, r.t_start };
             heap.push(a);
         }
 
@@ -114,7 +115,8 @@ void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
         int64_t pr = (weighting == Weighting::Flow)
                         ? (r.packets_rev > 0 ? 1 : 0) : r.packets_rev;
         if (pr > 0) {
-            ActiveFlow b{ r.rev, r.t_start, r.t_end, pr, r.bytes_rev, 0, r.t_start };
+            FlowToken tok = prepare(applySymmetry(sym, r.rev, offset));
+            ActiveFlow b{ tok, r.t_start, r.t_end, pr, r.bytes_rev, 0, r.t_start };
             heap.push(b);
         }
     }

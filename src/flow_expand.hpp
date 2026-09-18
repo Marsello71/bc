@@ -16,27 +16,26 @@
 #include "config.hpp"
 #include "transform.hpp"
 
-// How a packet counts toward its channel's load.
-//   Flow   - one unit per flow direction (reproduces the simple-tuple view)
-//   Packet - one unit per packet
-//   Byte   - the packet's size in bytes (bandwidth / DMA load)
 enum class Weighting { Flow = 0, Packet = 1, Byte = 2 };
 
 Weighting parseWeighting(const char *arg);   // "flow"/"packet"/"byte" or "0"/"1"/"2"
 const char *weightingName(Weighting w);      // lowercase name for the CSV column
 
-// The callback expandInterleaved calls for every packet it produces. Think of it
-// as the body of the per-packet loop: `tuple` is already symmetrised, `weight` is
-// what to add to the channel bucket. We use a callback (not a returned vector)
-// because the packet count runs into the billions - nothing may be kept around.
-using PacketSink =
-    std::function<void(const std::array<uint8_t, TUPLE_SIZE> &tuple, int64_t weight)>;
 
-// Read 11-field flow rows from `in` (header already consumed), blow each flow up
-// into its real packets, interleave packets of concurrent flows by time, apply
-// `sym`/`offset`, and call `sink` once per packet in time order.
-// Precondition: rows are sorted by flow start time.
+using FlowToken = uint32_t;
+
+
+using FlowPrepare =
+    std::function<FlowToken(const std::array<uint8_t, TUPLE_SIZE> &tuple)>;
+
+
+using PacketSink = std::function<void(FlowToken token, int64_t weight)>;
+
+
+using FlowRelease = std::function<void(FlowToken token)>;
+
 void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
-                       Weighting weighting, const PacketSink &sink);
+                       Weighting weighting, const FlowPrepare &prepare,
+                       const PacketSink &sink, const FlowRelease &release);
 
 #endif // FLOW_EXPAND_HPP
