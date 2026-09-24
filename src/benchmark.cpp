@@ -31,6 +31,12 @@
 #include "flow_expand.hpp"
 #include "reta.hpp"
 
+#if RETA_ON
+    using FlowSlot = uint8_t;
+#else
+    using FlowSlot = uint32_t;
+#endif
+
 std::vector<std::array<uint8_t, config::RSS_KEY_SIZE>> getKeys() {
     std::vector<std::array<uint8_t, config::RSS_KEY_SIZE>>  keys;
     std::mt19937 generator(config::KEY_SEED);
@@ -105,6 +111,7 @@ static void runSimpleTupleMode(std::istream &reader, ResultsWriter &writer,
 // packet at a time and we count it into EVERY (algo, key, channel-count) bucket
 // in a single pass. that's why the histogram has so many dimensions - all of them
 // have to be live at once.
+#if RETA_ON
 static void runFlowMode(std::istream &reader, ResultsWriter &writer,
                         Symmetry sym, size_t offset, Weighting weighting,
                         const KeySet &keys) {
@@ -113,20 +120,9 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
     const std::size_t NK = config::NUM_KEYS;
     const std::size_t NC = config::CHANNEL_COUNTS.size();
 
-#if RETA_ON
-
     std::vector<int64_t> buckets(NA * NK * RETA_SIZE, 0);
     std::vector<int64_t> chan;
     chan.reserve(static_cast<std::size_t>(CC.back()));
-#else
-    using Hist = std::vector<int64_t>;
-    std::vector<std::vector<std::vector<Hist>>> histograms(NA, std::vector<std::vector<Hist>>(NK, std::vector<Hist>(NC)));
-
-    for (std::size_t a = 0; a < NA; a++)
-        for (std::size_t k = 0; k < NK; k++)
-            for (std::size_t c = 0; c < NC; c++)
-                histograms[a][k][c].assign(CC[c], 0);
-#endif
 
     // ---- per flow direction state -------------------------------------------
     // Every packet of a direction has the same tuple, so its NA*NK hashes are
@@ -134,11 +130,8 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
     // a direction ends, so this stays at the high-water mark of concurrent
     // directions (~800k on the full dataset), not one slot per flow in the file.
     const std::size_t PER_FLOW = NA * NK;        // one value per (algo, key)
-#if RETA_ON
-    std::vector<uint8_t>  flow_slots;            // RETA entry index, fits in a byte
-#else
-    std::vector<uint32_t> flow_slots;            // raw hash, the % CC[c] stays per packet
-#endif
+
+    std::vector<FlowSlot>  flow_slots;            // RETA entry index, fits in a byte
     std::vector<FlowToken> free_slots;
     FlowToken next_slot = 0;
 
@@ -157,11 +150,7 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
         for (std::size_t a = 0; a < NA; ++a) {
             for (std::size_t k = 0; k < NK; ++k) {
                 uint32_t h = hash_functions_arr[a].fn(tuple.data(), TUPLE_SIZE, keys[k].data());
-#if RETA_ON
                 flow_slots[base + a * NK + k] = static_cast<uint8_t>(h & (RETA_SIZE - 1));
-#else
-                flow_slots[base + a * NK + k] = h;
-#endif
             }
         }
 
@@ -188,20 +177,13 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
         for (std::size_t a = 0; a < NA; ++a) {
             for (std::size_t k = 0; k < NK; ++k) {
                 const auto v = flow_slots[base + a * NK + k];
-#if RETA_ON
                 buckets[(a * NK + k) * RETA_SIZE + v] += weight;
-#else
-                for (std::size_t c = 0; c < NC; ++c) {
-                    histograms[a][k][c][v % CC[c]] += weight;
-                }
-#endif
             }
         }
 
         // window full -> one CSV row per (algo, key, channel-count), then reset
         if (packet_count % config::WINDOW_SIZE == 0) {
             window_index++;
-#if RETA_ON
             for (std::size_t a = 0; a < NA; ++a) {
                 for (std::size_t k = 0; k < NK; ++k) {
                     const std::size_t base = (a * NK + k) * RETA_SIZE;
@@ -230,7 +212,88 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
                     std::fill(buckets.begin() + base, buckets.begin() + base + RETA_SIZE, 0);
                 }
             }
+            window_sum_total = 0;
+        }
+    };
+
+    expandInterleaved(reader, sym, offset, weighting, prepare, sink, release);
+    std::cout << "Streamed " << packet_count << " packets, " << window_index << " full windows, "
+              << next_slot << " flow slots (" << (next_slot * PER_FLOW * sizeof(flow_slots[0])) / (1024 * 1024)
+              << " MB).\n";
+}
+
 #else
+static void runFlowMode(std::istream &reader, ResultsWriter &writer,
+                        Symmetry sym, size_t offset, Weighting weighting,
+                        const KeySet &keys) {
+    const auto &CC = config::CHANNEL_COUNTS;
+    const std::size_t NA = hash_functions_arr.size();
+    const std::size_t NK = config::NUM_KEYS;
+    const std::size_t NC = config::CHANNEL_COUNTS.size();
+
+    using Hist = std::vector<int64_t>;
+    std::vector<std::vector<std::vector<Hist>>> histograms(NA, std::vector<std::vector<Hist>>(NK, std::vector<Hist>(NC)));
+
+    for (std::size_t a = 0; a < NA; a++)
+        for (std::size_t k = 0; k < NK; k++)
+            for (std::size_t c = 0; c < NC; c++)
+                histograms[a][k][c].assign(CC[c], 0);
+    const std::size_t PER_FLOW = NA * NK;        // one value per (algo, key)
+
+    std::vector<FlowSlot>  flow_slots;            // RETA entry index, fits in a byte
+    std::vector<FlowToken> free_slots;
+    FlowToken next_slot = 0;
+
+    FlowPrepare prepare = [&](const std::array<uint8_t, TUPLE_SIZE> &tuple) -> FlowToken {
+        FlowToken tok;
+        if (!free_slots.empty()) {
+            tok = free_slots.back();
+            free_slots.pop_back();
+        } else {
+            tok = next_slot++;
+            flow_slots.resize(static_cast<std::size_t>(next_slot) * PER_FLOW);
+        }
+        const std::size_t base = static_cast<std::size_t>(tok) * PER_FLOW;
+
+        // the only place a hash is computed now - once per flow direction
+        for (std::size_t a = 0; a < NA; ++a) {
+            for (std::size_t k = 0; k < NK; ++k) {
+                uint32_t h = hash_functions_arr[a].fn(tuple.data(), TUPLE_SIZE, keys[k].data());
+                flow_slots[base + a * NK + k] = h;
+            }
+        }
+
+        return tok;
+    };
+
+    FlowRelease release = [&](FlowToken tok) { free_slots.push_back(tok); };
+    
+    int64_t packet_count = 0;
+    int64_t window_sum_total = 0;   // sum of weights in the current window (metric denominator)
+    long    window_index = 0;
+
+    // runs for every packet flow_expand produces, in time order. this lambda is
+    // effectively the inner loop body - flow_expand is the "for each packet" around it.
+    PacketSink sink = [&](FlowToken token, int64_t weight) {
+        packet_count++;
+        window_sum_total += weight;
+
+        const std::size_t base = static_cast<std::size_t>(token) * PER_FLOW;
+
+        // no hashing here any more - just count the packet into the bucket its
+        // direction was mapped to when it went live
+        for (std::size_t a = 0; a < NA; ++a) {
+            for (std::size_t k = 0; k < NK; ++k) {
+                const auto v = flow_slots[base + a * NK + k];
+                for (std::size_t c = 0; c < NC; ++c) {
+                    histograms[a][k][c][v % CC[c]] += weight;
+                }
+            }
+        }
+
+        // window full -> one CSV row per (algo, key, channel-count), then reset
+        if (packet_count % config::WINDOW_SIZE == 0) {
+            window_index++;
             for (std::size_t a = 0; a < NA; ++a) {
                 for (std::size_t k = 0; k < NK; ++k) {
                     for (std::size_t c = 0; c < NC; ++c) {
@@ -249,7 +312,6 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
                     }
                 }
             }
-#endif
             window_sum_total = 0;
         }
     };
@@ -259,6 +321,7 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
               << next_slot << " flow slots (" << (next_slot * PER_FLOW * sizeof(flow_slots[0])) / (1024 * 1024)
               << " MB).\n";
 }
+#endif
 
 // number of comma-separated fields in a CSV line (commas inside quotes don't count)
 static int countFields(const std::string &line) {

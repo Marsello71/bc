@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
@@ -28,6 +29,8 @@ SYM_LABELS = {"none": "none", "xorfold": "xor", "sortfold": "sort"}
 #   byte   - velkost paketu v bajtoch
 WEIGHT_ORDER = ["flow", "packet", "byte"]
 WEIGHT_LABELS = {"flow": "per flow", "packet": "per packet", "byte": "per byte"}
+WEIGHT_COLORS = {"flow": "#4C72B0", "packet": "#DD8452", "byte": "#55A868"}
+
 
 
 def load_results(results_dir: Path) -> pd.DataFrame:
@@ -150,48 +153,61 @@ def plot_overload_grid(data: pd.DataFrame, sym: str, output_path: Path) -> None:
     plt.close(fig)
 
 
-def prep_spread(data: pd.DataFrame, sym: str) -> pd.DataFrame:
-    """pre kazdu (vaha, pocet kanalov): rozdiel najhorsi - najlepsi algoritmus.
-    ak je tento rozdiel maly, na vybere hashu nezalezi."""
-    sub = data[data["symmetry"] == sym]
-    per_key = (sub.groupby(["weighting", "algorithm", "num_channels", "key_id"])["thresshold_sum"]
-               .mean().reset_index())
-    per_algo = (per_key.groupby(["weighting", "algorithm", "num_channels"])["thresshold_sum"]
-                .mean().reset_index())
-    return (per_algo.groupby(["weighting", "num_channels"])["thresshold_sum"]
-            .agg(spread=lambda s: s.max() - s.min()).reset_index())
+def compute_eta2(data: pd.DataFrame) -> pd.DataFrame:
+    """eta^2 = SS_medzi_algoritmami / SS_celkovo pre kazdu (vaha, symetria, kanaly).
+
+    0 = rozdiely su len sum z volby kluca (na hashi nezalezi),
+    1 = rozdiely vysvetluje vyhradne algoritmus.
+    """
+    per_key = (data.groupby(["weighting", "symmetry", "algorithm", "num_channels", "key_id"])
+               ["thresshold_sum"].mean().reset_index())
+
+    rows = []
+    for (w, sym, ch), g in per_key.groupby(["weighting", "symmetry", "num_channels"]):
+        grand_mean = g["thresshold_sum"].mean()
+        algo_stats = g.groupby("algorithm")["thresshold_sum"].agg(["mean", "count"])
+        ss_total = ((g["thresshold_sum"] - grand_mean) ** 2).sum()
+        ss_between = (algo_stats["count"] * (algo_stats["mean"] - grand_mean) ** 2).sum()
+        rows.append({
+            "weighting": w, "symmetry": sym, "num_channels": ch,
+            "eta2": ss_between / ss_total if ss_total else float("nan"),
+        })
+    return pd.DataFrame(rows)
 
 
 def plot_spread(data: pd.DataFrame, output_path: Path) -> None:
-    """1x3 (symetrie), v kazdom panely 3 ciary (vahy) - rozpatie thresshold_sum
-    medzi najlepsim a najhorsim algoritmom. Toto je graf, co priamo odpovie na
-    otazku 'zalezi na hashi': ak ciary padaju k nule idesr flow -> packet -> byte,
-    zalezi menej a menej."""
+    """1x3 (stlpce = symetrie): eta^2 v zavislosti od poctu kanalov, ciara na vahu."""
+    eta = compute_eta2(data)
     fig, axes = plt.subplots(1, 3, figsize=(15, 4.5), sharey=True, constrained_layout=True)
 
-    for ax, sym in zip(axes, SYM_ORDER):
-        sp = prep_spread(data, sym)
+    for col, sym in enumerate(SYM_ORDER):
+        ax = axes[col]
         for w in WEIGHT_ORDER:
-            g = sp[sp["weighting"] == w].sort_values("num_channels")
+            g = eta[(eta["symmetry"] == sym) & (eta["weighting"] == w)].sort_values("num_channels")
             if g.empty:
                 continue
             xpos = [CHANNELS.index(c) for c in g["num_channels"]]
-            ax.plot(xpos, g["spread"], marker="o", markersize=5, linewidth=1.5,
-                    label=WEIGHT_LABELS[w])
+            ax.plot(xpos, g["eta2"], marker="o", markersize=5, linewidth=1.6,
+                    color=WEIGHT_COLORS[w])
+        ax.set_ylim(0, 1)
+        ax.set_title(SYM_LABELS[sym], fontsize=11)
         ax.set_xticks(range(len(CHANNELS)))
         ax.set_xticklabels(CHANNELS)
         ax.set_xlabel("DMA channels")
-        ax.set_title(SYM_LABELS[sym], fontsize=11)
         ax.grid(True, axis="y", color="#e1e0d9", linewidth=0.6)
         ax.set_axisbelow(True)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
 
-    axes[0].set_ylabel("Spread: worst − best algorithm [‰]")
-    axes[-1].legend(frameon=False, title="weighting")
+    axes[0].set_ylabel("η² — share of variance explained by algorithm")
 
-    fig.suptitle("the hash spread (worst - best)", fontsize=13)
+    handles = [plt.Line2D([], [], color=WEIGHT_COLORS[w], marker="o", markersize=5,
+                          label=WEIGHT_LABELS[w]) for w in WEIGHT_ORDER]
+    fig.legend(handles=handles, loc="upper center", ncol=len(WEIGHT_ORDER), frameon=False,
+               bbox_to_anchor=(0.5, 1.06))
+    fig.suptitle("Does the hash choice matter? — η² (0 = no, 1 = fully)", y=1.11, fontsize=13)
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-
 
 def aggregate_by_algorithm__for_box_plot(data: pd.DataFrame, DMA: int, metric: str) -> pd.DataFrame:
     filtered = data[data["num_channels"] == DMA]
@@ -284,7 +300,7 @@ def main():
     for sym in SYM_ORDER:
         plot_overload_grid(combined_all, sym, outdir / f"overload_{sym}.png")
 
-    # B: zalezi na hashi? jeden obrazok, rozpatie algoritmov flow -> packet -> byte
+    # B: zalezi na hashi? jeden obrazok, eta^2 (podiel rozptylu vysvetleny algoritmom)
     plot_spread(combined_all, outdir / "spread.png")
 
     # C: citlivost na RSS kluc pri flow vahe (cista kvalita hashu, bez elephant flow-ov)
