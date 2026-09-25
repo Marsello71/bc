@@ -134,7 +134,7 @@ static void runFlowMode(std::istream &reader, ResultsWriter &writer,
     std::vector<FlowSlot>  flow_slots;            // RETA entry index, fits in a byte
     std::vector<FlowToken> free_slots;
     FlowToken next_slot = 0;
-
+    
     FlowPrepare prepare = [&](const std::array<uint8_t, TUPLE_SIZE> &tuple) -> FlowToken {
         FlowToken tok;
         if (!free_slots.empty()) {
@@ -336,10 +336,10 @@ static int countFields(const std::string &line) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 5 || argc > 6) {
+    if (argc < 4 || argc > 5) {
         std::cerr <<
-            "usage: benchmark <dataset.csv> <output.csv> <sym 0|1|2> <short_tuple 0|1> [weighting flow|packet|byte]\n"
-            "  simple-tuple CSV (3 or 5 fields): 4th arg picks the short-tuple offset, weighting is ignored\n"
+            "usage: benchmark <dataset.csv> <output.csv> <sym 0|1|2> [weighting flow|packet|byte]\n"
+            "  simple-tuple CSV (3 or 5 fields): tuple layout is auto-detected from field count, weighting is ignored\n"
             "  flow CSV (11 fields): 5th arg required, picks how channel load is counted\n";
         return 1;
     }
@@ -365,16 +365,15 @@ int main(int argc, char *argv[]) {
     auto keys = getKeys();
     
     if (fields == 11) {
-        if (argc != 6) {
+        if (argc != 5) {
             std::cerr << "flow CSV needs the weighting argument (flow|packet|byte)\n";
             return 1;
         }
-        Weighting weighting = parseWeighting(argv[5]);
-        size_t offset = 18;                // flow tuples are always the 5-tuple layout
+        Weighting weighting = parseWeighting(argv[4]);
+        size_t offset = OFFSET;                // offset is based on the config file full tuple/IP_only
         runFlowMode(reader, writer, sym, offset, weighting, keys);
     } else if (fields == 3 || fields == 5) {
-        bool short_tuple = std::atoi(argv[4]);
-        size_t offset = short_tuple ? 16 : 18;
+        size_t offset = (fields == 3) ? 16 : 18;
         runSimpleTupleMode(reader, writer, sym, offset, keys);
     } else {
         std::cerr << "unrecognised CSV: header has " << fields << " fields\n";

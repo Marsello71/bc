@@ -42,6 +42,14 @@ constexpr std::size_t TUPLE_SIZE = 36;
 
 #define RETA_ON 1
 
+#define IP_ONLY_ON 1
+
+#if IP_ONLY_ON 
+    constexpr std::size_t OFFSET = 16;
+#else 
+    constexpr std::size_t OFFSET = 18;
+#endif
+
 constexpr std::size_t RETA_SIZE = 128; //128/512
 
 static_assert((RETA_SIZE & (RETA_SIZE - 1)) == 0,
