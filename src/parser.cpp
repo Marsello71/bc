@@ -58,8 +58,8 @@ std::array<uint8_t, TUPLE_SIZE> tuple37(std::vector<std::string> fields) {
     return key;
 }
 
-std::array<uint8_t, TUPLE_SIZE> tuple34(std::vector<std::string> fields) {
-    std::array<uint8_t, TUPLE_SIZE> key = {};
+std::array<uint8_t, TUPLE_SIZE> tuple32(std::vector<std::string> fields) {
+    std::array<uint8_t, TUPLE_SIZE> key = {};  // inicializovane cele na 0
     int offset = 0;
 
     uint8_t src_IP[16];
@@ -72,9 +72,9 @@ std::array<uint8_t, TUPLE_SIZE> tuple34(std::vector<std::string> fields) {
     std::memcpy(key.data() + offset, dst_IP, 16);
     offset += 16;
 
-    uint16_t vlan_id = htons(static_cast<uint16_t>(std::stoi(fields[2])));
-    std::memcpy(key.data() + offset, &vlan_id, 2);
-    offset += 2;
+    // uint16_t vlan_id = htons(static_cast<uint16_t>(std::stoi(fields[2])));
+    // std::memcpy(key.data() + offset, &vlan_id, 2);
+    // offset += 2;
 
     return key; 
 }
@@ -86,7 +86,7 @@ std::array<uint8_t, TUPLE_SIZE> parseLineToTuple(const std::string& line) {
     if (fields.size() == 5) {
         return tuple37(fields);
     } else if( fields.size() == 3) {
-        return tuple34(fields);
+        return tuple32(fields);
     }  else throw std::runtime_error("The row has not correct number of fields");
 
     return {};
@@ -116,9 +116,16 @@ FlowRow parseFlowLine(const std::string& line) {
     FlowRow row;
     row.t_start     = parseFlowTimestamp(f[0]);
     row.t_end       = parseFlowTimestamp(f[1]);
-    if (row.t_end < row.t_start) row.t_end = row.t_start;   // midnight wrap / bad data -> instant flow
+    if (row.t_end < row.t_start) row.t_end = row.t_start; // midnight wrap / bad data -> instant flow
+
+#if IP_ONLY_ON
+    row.fwd         = tuple32({ f[2],f[4]});   // src -> dst
+    row.rev         = tuple32({ f[4],f[2]});   // dst -> src (swapped for the reverse packets)
+#else 
     row.fwd         = tuple37({ f[2], f[3], f[4], f[5], f[6] });   // src -> dst
     row.rev         = tuple37({ f[4], f[5], f[2], f[3], f[6] });   // dst -> src (swapped for the reverse packets)
+#endif
+
     row.bytes_fwd   = std::stoll(f[7]);
     row.packets_fwd = std::stoll(f[8]);
     row.bytes_rev   = std::stoll(f[9]);

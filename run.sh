@@ -22,7 +22,7 @@ launch() {
     local sym="$1" w="$2" out_csv="$3"
     (
         start=$SECONDS
-        ./benchmark "$DATA" "$out_csv" "$sym" 0 ${w:+"$w"}
+        ./benchmark "$DATA" "$out_csv" "$sym" ${w:+"$w"}
         echo "hotovo sym=$sym ${w:-flow}: $((SECONDS - start)) s" | tee -a
     ) &
     # nepusti viac ako JOBS uloh naraz

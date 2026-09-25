@@ -79,3 +79,9 @@ data/
 *.csv
 
 venv
+
+results1/
+results2/
+results4/
+results6/
+
