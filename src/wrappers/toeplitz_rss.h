@@ -1,6 +1,6 @@
 /**
  * @file toeplitz_rss.h
- * @brief RSS wrapper around the jhash implementation in external/jhash.
+ * @brief RSS wrapper around the toeplitz implementation in external/toeplitz.
  *
  * Marcel Koptak xkoptam00@vutbr.cz
  */

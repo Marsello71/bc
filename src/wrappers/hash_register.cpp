@@ -6,6 +6,7 @@ const std::array<hash_algoritm, 5> hash_functions_arr = {{
         {"jhash", jhashlittleRssWrapper},
         {"chaskey", chaskeyRssWrapper},
         {"halfsiphash", halfSipHashRssWrapper},
-        {"multiplyshift", multiplyShiftRssWrapper} /*,
-        {"xorhash", xorHashRssWrapper}*/
+        {"simpletab",simpletabRssWrapper}
+        /* {"multiplyshift", multiplyShiftRssWrapper},
+        {"xorhash", xorHashRssWrapper} */
 }};

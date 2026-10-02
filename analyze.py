@@ -11,14 +11,14 @@ CHANNELS = [8, 16, 20, 32, 40, 64, 128]
 
 COLORS = {
     "toeplitz": "black", "jhash": "#4C72B0", "chaskey": "#55A868",
-    "halfsiphash": "#C44E52", "multiplyshift": "#CCB974",
+    "halfsiphash": "#C44E52", "simpletab": "#CCB974",
 }
-MARKERS = {"chaskey": "o", "multiplyshift": "s", "halfsiphash": "^", "jhash": "D"}
+MARKERS = {"chaskey": "o", "simpletab": "s", "halfsiphash": "^", "jhash": "D"}
 LABELS = {
-    "chaskey": "Chaskey", "multiplyshift": "multiply-shift (NH)",
+    "chaskey": "Chaskey", "simpletab": "simpletab",
     "halfsiphash": "HalfSipHash", "jhash": "jhash (lookup3)",
 }
-BOX_ALGOS = ["toeplitz", "jhash", "chaskey", "halfsiphash", "multiplyshift"]
+BOX_ALGOS = ["toeplitz", "jhash", "chaskey", "halfsiphash", "simpletab"]
 
 SYM_ORDER = ["none", "xorfold", "sortfold"]
 SYM_LABELS = {"none": "none", "xorfold": "xor", "sortfold": "sort"}
