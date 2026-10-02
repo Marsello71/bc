@@ -13,8 +13,10 @@
 #include "halfsiphash_rss.h"
 #include "jhash_rss.h"
 #include "toeplitz_rss.h"
+#include "simpletab_rss.h"
 //#include "xorhash_rss.h"
-#include "multiplyshift_rss.h"
+//#include "multiplyshift_rss.h"
+
 
 using RssHashFunction  = uint32_t (*)(const uint8_t *, size_t, const uint8_t *);
 

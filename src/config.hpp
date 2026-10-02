@@ -30,7 +30,7 @@ constexpr uint32_t WINDOW_SIZE = 150000;
 constexpr std::size_t NUM_KEYS = 16;
 
 /// Length of an RSS key in bytes.
-constexpr std::size_t RSS_KEY_SIZE = 44;
+constexpr std::size_t RSS_KEY_SIZE = 40;
 
 /// DMA channel counts under test. Powers of two and two non-powers (20, 40) —
 /// keep this ascending, the RETA_SIZE static_assert below reads the last element.

@@ -30,6 +30,7 @@
 #include "metrics.hpp"
 #include "flow_expand.hpp"
 #include "reta.hpp"
+#include "wrappers/simpletab_rss.h"
 
 #if RETA_ON
     using FlowSlot = uint8_t;
@@ -363,6 +364,7 @@ int main(int argc, char *argv[]) {
     int fields = countFields(header);
 
     auto keys = getKeys();
+    simpletabInit(keys);
     
     if (fields == 11) {
         if (argc != 5) {
