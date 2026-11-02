@@ -24,6 +24,9 @@ Weighting parseWeighting(const char *arg) {
     return Weighting::Flow;
 }
 
+// Returns a pointer to a string literal, not a function pointer: the `*` belongs
+// to the return type (const char*). Literals live in read-only memory for the
+// whole program, so returning their address is safe and costs no allocation.
 const char *weightingName(Weighting w) {
     switch (w) {
         case Weighting::Packet: return "packet";
@@ -37,21 +40,27 @@ namespace {
 // one direction of one flow that is currently "live" in the merge heap.
 // it carries only the caller's token, not the tuple - the heap moves entries
 // around on every push/pop, so the less each one weighs the better.
+// the heap holds one entry per live flow, never one per packet - that's what
+// keeps memory flat even though the full dataset expands to billions of packets.
 struct ActiveFlow {
-    FlowToken token;
+    FlowToken token;                        // the caller's ticket for this flow, see flow_expand.hpp
     double  t_start;
     double  t_end;
     int64_t packets_total;                  // how many packets this direction has in total
     int64_t bytes_total;
     int64_t emitted;                        // how many already went out
-    double  next_time;                      // time of this flow's next unsent packet
+    double  next_time;                      // time of this flow's next unsent packet (the heap key)
 
     // we want the earliest packet on top. priority_queue is a max-heap by default,
     // so we flip the comparison: operator> + std::greater => min-heap on next_time.
     bool operator>(const ActiveFlow &o) const { return next_time > o.next_time; }
 };
 
-// time of packet #k (0-based) if the flow's packets are spread evenly over [t_start, t_end]
+// time of packet #k (0-based) if the flow's packets are spread evenly over [t_start, t_end].
+// the first packet lands exactly on t_start and the last exactly on t_end, so N packets
+// leave N-1 gaps between them - hence the "- 1". e.g. 5 packets over [0.0, 0.5]:
+//   gap = 0.5 / 4 = 0.125  ->  0.000, 0.125, 0.250, 0.375, 0.500
+// dividing by N instead would make the flow end early (last packet at 0.4).
 double packetTime(const ActiveFlow &f, int64_t k) {
     if (f.packets_total <= 1) {
         return f.t_start;                   // one packet -> nothing to spread (also avoids /0)
@@ -72,8 +81,16 @@ int64_t packetWeight(const ActiveFlow &f, Weighting w) {
 void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
                        Weighting weighting, const FlowPrepare &prepare,
                        const PacketSink &sink, const FlowRelease &release) {
+    // min-heap of live flows, ordered by the time of each flow's NEXT packet.
+    // top() is always the flow whose next packet is the earliest of all.
     std::priority_queue<ActiveFlow, std::vector<ActiveFlow>, std::greater<ActiveFlow>> heap;
 
+    // send out the globally earliest packet:
+    //   1. take the flow on top of the heap
+    //   2. hand its next packet to sink()
+    //   3. if it has more packets, compute when the next one comes and put it back -
+    //      the heap re-sorts it among the other flows, which is what interleaves them
+    //   4. otherwise the flow is finished: release() its token for reuse
     auto emitTop = [&]() {
         ActiveFlow af = heap.top(); heap.pop();            // copy + pop: top() can't be edited in place
         sink(af.token, packetWeight(af, weighting));
@@ -98,16 +115,19 @@ void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
             continue;
         }
 
-        // before we add the new flow, emit everything queued that happens before it starts
+        // before we add the new flow, emit everything queued that happens before it starts.
+        // this is only correct because rows are sorted by start time: no later row can
+        // start before r, so every packet up to r.t_start is final and can go out now.
         while (!heap.empty() && heap.top().next_time <= r.t_start) emitTop();
 
-        // symmetry and hashing happen once here, not once per packet
+        // symmetry and hashing happen once here, not once per packet:
+        // prepare() gets the symmetrised tuple, the heap entry only keeps the token
 
         // forward direction (Flow weighting collapses it to a single packet)
         int64_t pf = (weighting == Weighting::Flow) ? 1 : r.packets_fwd;
         if (pf > 0) {
             FlowToken tok = prepare(applySymmetry(sym, r.fwd, offset));
-            ActiveFlow a{ tok, r.t_start, r.t_end, pf, r.bytes_fwd, 0, r.t_start };
+            ActiveFlow a{ tok, r.t_start, r.t_end, pf, r.bytes_fwd, 0, r.t_start };  // first packet at t_start
             heap.push(a);
         }
 
