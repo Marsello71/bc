@@ -48,11 +48,22 @@ const char *weightingName(Weighting w);      // lowercase name for the CSV colum
 using FlowToken = uint32_t;
 
 
+/// What prepare() knows about a flow direction besides its tuple - exactly the
+/// numbers flow_expand will use to emit it. The hash modes ignore it (a real NIC
+/// can't know any of this when the first packet arrives); the JSQ oracle uses it
+/// to know in advance how fast the flow is going to send.
+struct FlowInfo {
+    double  t_start;
+    double  t_end;
+    int64_t packets;   // packets this direction will emit (always 1 with Flow weighting)
+    int64_t weight;    // weight of each of those packets (see Weighting)
+};
+
 /// Called once per flow direction, with its (already symmetrised) tuple.
 /// The caller does the expensive per-flow work here (hashing) and returns the
 /// token under which it stored the result.
 using FlowPrepare =
-    std::function<FlowToken(const std::array<uint8_t, TUPLE_SIZE> &tuple)>;
+    std::function<FlowToken(const std::array<uint8_t, TUPLE_SIZE> &tuple, const FlowInfo &info)>;
 
 
 /// Called once per packet. Gets only the flow's token and the packet's weight -

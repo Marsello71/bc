@@ -123,11 +123,14 @@ void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
         // symmetry and hashing happen once here, not once per packet:
         // prepare() gets the symmetrised tuple, the heap entry only keeps the token
 
-        // forward direction (Flow weighting collapses it to a single packet)
+        // forward direction (Flow weighting collapses it to a single packet).
+        // the entry is built first (token filled in below) so prepare() can be told
+        // exactly what will be emitted: packet count and per-packet weight
         int64_t pf = (weighting == Weighting::Flow) ? 1 : r.packets_fwd;
         if (pf > 0) {
-            FlowToken tok = prepare(applySymmetry(sym, r.fwd, offset));
-            ActiveFlow a{ tok, r.t_start, r.t_end, pf, r.bytes_fwd, 0, r.t_start };  // first packet at t_start
+            ActiveFlow a{ 0, r.t_start, r.t_end, pf, r.bytes_fwd, 0, r.t_start };  // first packet at t_start
+            a.token = prepare(applySymmetry(sym, r.fwd, offset),
+                              FlowInfo{ a.t_start, a.t_end, a.packets_total, packetWeight(a, weighting) });
             heap.push(a);
         }
 
@@ -135,8 +138,9 @@ void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
         int64_t pr = (weighting == Weighting::Flow)
                         ? (r.packets_rev > 0 ? 1 : 0) : r.packets_rev;
         if (pr > 0) {
-            FlowToken tok = prepare(applySymmetry(sym, r.rev, offset));
-            ActiveFlow b{ tok, r.t_start, r.t_end, pr, r.bytes_rev, 0, r.t_start };
+            ActiveFlow b{ 0, r.t_start, r.t_end, pr, r.bytes_rev, 0, r.t_start };
+            b.token = prepare(applySymmetry(sym, r.rev, offset),
+                              FlowInfo{ b.t_start, b.t_end, b.packets_total, packetWeight(b, weighting) });
             heap.push(b);
         }
     }
