@@ -42,7 +42,7 @@ constexpr std::size_t TUPLE_SIZE = 36;
 
 #define RETA_ON 1
 
-#define IP_ONLY_ON 1
+#define IP_ONLY_ON 0
 
 #if IP_ONLY_ON 
     constexpr std::size_t OFFSET = 16;
