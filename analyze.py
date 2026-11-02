@@ -97,6 +97,10 @@ def plot_overload_grid(data: pd.DataFrame, sym: str, output_path: Path) -> None:
             rel_max = max(rel_max, rel.max())
     margin = max(0.005, (rel_max - rel_min) * 0.1)
     rel_lo, rel_hi = rel_min - margin, rel_max + margin
+    # riadok 1 (absolutne hodnoty) ma zamerne VLASTNU os na kazdy panel - so
+    # spolocnou osou sa rozdiely medzi hashmi v ramci jednej vahy stratili
+    # (flow/packet/byte su od seba radovo inak velke). Na ten medzi-vahovy
+    # skok je samostatny obrazok plot_elephant_evidence() so spolocnou osou.
 
     for col, w in enumerate(WEIGHT_ORDER):
         ax_abs = axes[0, col]
@@ -149,6 +153,61 @@ def plot_overload_grid(data: pd.DataFrame, sym: str, output_path: Path) -> None:
               frameon=False, bbox_to_anchor=(0.5, 1.05))
 
     fig.suptitle(f"Channel overload — symmetry: {SYM_LABELS[sym]}", y=1.1, fontsize=13)
+    fig.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_elephant_evidence(data: pd.DataFrame, sym: str, output_path: Path) -> None:
+    """1x3 (flow/packet/byte), priemer thresshold_sum cez VSETKY hashe - tu
+    nas nezaujima rozdiel medzi algoritmami (na to je plot_overload_grid),
+    len to ci sa menia rady velkosti medzi vahami. Preto spolocna os cez
+    vsetky 3 panely - podklad pre to, ze elephant flow-y (nie zly hash) su
+    zdroj preťaženia a ze ich treba rozrezat na viac kanalov.
+    """
+    sub_sym = data[data["symmetry"] == sym]
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4.5), constrained_layout=True)
+
+    per_weighting = {}
+    abs_min, abs_max = None, None
+    for w in WEIGHT_ORDER:
+        sub_w = sub_sym[sub_sym["weighting"] == w]
+        if sub_w.empty:
+            per_weighting[w] = None
+            continue
+        per_algo = aggregate_over_channels(sub_w, "thresshold_sum")      # uz priemer cez kluce
+        avg = per_algo.groupby("num_channels")["mean"].mean().reset_index(name="mean")  # teraz aj cez algoritmy
+        per_weighting[w] = avg
+        vals = avg["mean"][avg["mean"] > 0]       # log os nema rada 0/zaporne hodnoty
+        if not vals.empty:
+            abs_min = vals.min() if abs_min is None else min(abs_min, vals.min())
+            abs_max = vals.max() if abs_max is None else max(abs_max, vals.max())
+    abs_lo, abs_hi = (1.0, 10.0) if abs_min is None else (abs_min / 1.3, abs_max * 1.3)
+
+    for ax, w in zip(axes, WEIGHT_ORDER):
+        if per_weighting[w] is None:
+            ax.axis("off")
+            ax.text(0.5, 0.5, "no windows\n(not enough traffic\nfor this weighting)",
+                    ha="center", va="center", fontsize=9, color="0.5", transform=ax.transAxes)
+            ax.set_title(WEIGHT_LABELS[w], fontsize=11)
+            continue
+
+        avg = per_weighting[w].sort_values("num_channels")
+        xpos = [CHANNELS.index(c) for c in avg["num_channels"]]
+        ax.plot(xpos, avg["mean"], marker="o", color=WEIGHT_COLORS[w], linewidth=2, markersize=6)
+        ax.set_yscale("log")
+        ax.set_ylim(abs_lo, abs_hi)
+        ax.set_title(WEIGHT_LABELS[w], fontsize=11)
+        ax.grid(True, axis="y", which="both", color="#e1e0d9", linewidth=0.6)
+        ax.set_axisbelow(True)
+        ax.set_xticks(range(len(CHANNELS)))
+        ax.set_xticklabels(CHANNELS)
+        ax.set_xlabel("DMA channels")
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+    axes[0].set_ylabel("Channel overload [‰] (log), avg. over all hashes")
+    fig.suptitle(f"Hash choice isn't the issue — flow size is (symmetry: {SYM_LABELS[sym]})",
+                 fontsize=13)
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
@@ -299,6 +358,10 @@ def main():
     # A: 3 obrazky (jeden na symetriu), v kazdom flow/packet/byte vedla seba
     for sym in SYM_ORDER:
         plot_overload_grid(combined_all, sym, outdir / f"overload_{sym}.png")
+
+    # A2: dokaz ze za pretazenim su elephant flow-y, nie hash - priemer cez
+    # vsetky hashe, spolocna os flow/packet/byte (symetria "none" = baseline)
+    plot_elephant_evidence(combined_all, "none", outdir / "elephant_evidence.png")
 
     # B: zalezi na hashi? jeden obrazok, eta^2 (podiel rozptylu vysvetleny algoritmom)
     plot_spread(combined_all, outdir / "spread.png")
