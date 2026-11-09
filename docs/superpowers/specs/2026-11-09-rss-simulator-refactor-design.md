@@ -1,7 +1,7 @@
 # Návrh: refaktor RSS simulátora
 
 Vetva: `refactor/rss-dma-simulator`
-Stav: návrh na odsúhlasenie
+Stav: odsúhlasený autorom (2026-11-09)
 
 ## 1. Prečo
 
@@ -109,10 +109,14 @@ docs/
   ako_to_funguje.md        jedna strana: tok programu, kde je čo
 ```
 
-Odstráni sa: režim jednoduchých tuple (3/5-stĺpcové CSV), `runFlowModeRetaOff` ako samostatná
-funkcia (RETA zap./vyp. bude krok „priradenie na kanál“), nepoužívané obálky (`siphash`,
-`xorhash`) a `external/crc32c`. Všetko zostane dostupné v histórii gitu a v tagu
-`v1.0-hash-comparison`.
+Odstráni sa: režim jednoduchých tuple (3/5-stĺpcové CSV) a `runFlowModeRetaOff` ako samostatná
+funkcia (RETA zap./vyp. bude krok „priradenie na kanál“). Zostane dostupné v histórii gitu
+a v tagu `v1.0-hash-comparison`.
+
+**Z `external/` ani zo `src/wrappers/` sa nič neodstraňuje** (rozhodnutie autora). Všetky hashe,
+ktoré majú obálku (toeplitz, jhash, chaskey, halfsiphash, simpletab, multiplyshift, siphash,
+xorhash), budú v zozname hashov a dajú sa vybrať v experimente. Predvolený je Toeplitz.
+`external/crc32c` nemá obálku a zostane tak, ako je.
 
 ### 5.2 Experiment
 
@@ -282,6 +286,7 @@ Autor:
 - Statické parametre (všetky v každom behu): počty kanálov, 16 kľúčov, symetrie, váhy, okno.
 - Porovnávané parametre: dataset, hash, RETA zap./vyp., IP only zap./vyp., varianta RSS.
 - Režim jednoduchých tuple sa ruší.
+- Z `external/` a `src/wrappers/` sa nič nemaže; všetky hashe s obálkou sú dostupné v experimente.
 - Refaktor píše Claude po malých častiach, autor každú prejde a odsúhlasí.
 
 Claude (autor ich môže zmeniť):
@@ -289,8 +294,6 @@ Claude (autor ich môže zmeniť):
 - Varianty cez `enum` + `switch`, nie dedičnosť (jednoduchšie na čítanie).
 - Jeden prechod = jedna váha; svety = kombinácie ostatných parametrov.
 - Formát experimentu: vlastný jednoduchý `kľúč = hodnota`, bez knižnice.
-- Odstránenie režimu jednoduchých tuple, obálok `siphash` a `xorhash` a `external/crc32c`.
-- `multiplyshift` sa vráti do zoznamu hashov (je na autorovom náčrte), predvolený je Toeplitz.
 - Paralelné prechody (napr. viac váh naraz) rieši buď `run.sh`, alebo program cez vlákna,
   podľa toho, čo bude jednoduchšie na čítanie.
 - Hranica výkonu: najviac ~20 % pomalšie pri rovnakom počte svetov.
