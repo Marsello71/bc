@@ -85,3 +85,9 @@ results2/
 results4/
 results6/
 ip_res1/
+super_results/
+
+# test outputs (regenerated, never committed)
+tests/out/
+tests/out_extra/
+tests/golden/
