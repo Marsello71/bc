@@ -146,16 +146,18 @@ Spustenie: `./run.sh experiments/hash_comparison.conf`. Výstupný adresár dost
 
 ### 5.3 Jeden beh a „svety“
 
-- **Jeden prechod datasetom = jedna váha.** Pakety sa generujú podľa váhy (pri `flow`
-  je to jeden „paket“ na smer flowu), preto má každá váha vlastný prechod.
-  Experiment s tromi váhami = tri prechody. Môžu bežať paralelne.
-- **Svet** je jedna kombinácia ostatných parametrov RSS: tuple × symetria × hash × kľúč ×
-  RETA, plus JSQ ako jeden svet bez kľúčov. Všetky svety sa simulujú v jednom prechode
-  naraz, rovnako ako dnes 5 hashov × 16 kľúčov. JSQ ignoruje tuple aj symetriu, preto
-  vzniká iba raz.
-- **Cena rastie s počtom svetov.** Predvolený experiment (Toeplitz, 16 kľúčov, 3 symetrie)
-  má 48 svetov, menej než dnešných 80. Kto zapne všetko so všetkým, počíta dlho. To je
-  zámer: experiment má byť cielené porovnanie.
+- **Jeden prechod datasetom = jedna váha × jedna symetria.** Pakety sa generujú podľa váhy
+  (pri `flow` je to jeden „paket“ na smer flowu). Prechody sú nezávislé a bežia paralelne,
+  takže pri 3 váhach × 3 symetriách je to 9 súbežných behov ako dnes. (Pôvodne tu bolo
+  „jeden prechod = jedna váha“, to by však dovolilo iba 3 paralelné behy a plný beh by
+  trval ~3× dlhšie.)
+- **Svet** je jedna kombinácia ostatných parametrov RSS: tuple × hash × kľúč × RETA.
+  Všetky svety sa simulujú v jednom prechode naraz, rovnako ako dnes 5 hashov × 16 kľúčov.
+  JSQ ignoruje tuple aj symetriu, preto je jeden svet bez kľúčov iba v prechode so
+  symetriou `none`.
+- **Cena rastie s počtom svetov.** Predvolený experiment (Toeplitz, 16 kľúčov) má
+  16 svetov na prechod, dnešné porovnanie hashov 80. Kto zapne všetko so všetkým, počíta
+  dlho. To je zámer: experiment má byť cielené porovnanie.
 
 ### 5.4 Hlavná slučka enginu (bez lambd)
 
@@ -273,7 +275,7 @@ Po každom kroku: porovnanie s referenciou + autor si prejde a odsúhlasí, čo 
 1. `Experiment` a súbor `.conf`, parametre za behu namiesto `#define`.
 2. `FlowReader` bez callbackov.
 3. RSS modul: tuple, hashe, priradenie (RETA / modulo / JSQ). Zlúčenie RetaOn/RetaOff.
-4. Nový formát výsledkov (jedno CSV na prechod, teda na váhu, so všetkými svetmi),
+4. Nový formát výsledkov (jedno CSV na prechod, teda na váhu × symetriu, so všetkými svetmi),
    `run.sh`, úprava `analyze.py` tak, aby všetky dnešné grafy fungovali ďalej.
 5. `docs/ako_to_funguje.md`.
 
@@ -292,8 +294,9 @@ Autor:
 Claude (autor ich môže zmeniť):
 
 - Varianty cez `enum` + `switch`, nie dedičnosť (jednoduchšie na čítanie).
-- Jeden prechod = jedna váha; svety = kombinácie ostatných parametrov.
+- Jeden prechod = váha × symetria (9 paralelných behov ako dnes); svety = tuple × hash ×
+  kľúč × RETA, JSQ iba v prechode so symetriou `none`.
 - Formát experimentu: vlastný jednoduchý `kľúč = hodnota`, bez knižnice.
-- Paralelné prechody (napr. viac váh naraz) rieši buď `run.sh`, alebo program cez vlákna,
-  podľa toho, čo bude jednoduchšie na čítanie.
+- Paralelné prechody rieši `run.sh`: program vypíše zoznam prechodov (`--list-passes`)
+  a `run.sh` každý spustí ako samostatný proces (`--pass <váha> <symetria>`).
 - Hranica výkonu: najviac ~20 % pomalšie pri rovnakom počte svetov.
