@@ -91,3 +91,6 @@ super_results/
 tests/out/
 tests/out_extra/
 tests/golden/
+
+# Python cache
+__pycache__/
