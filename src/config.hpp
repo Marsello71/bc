@@ -21,40 +21,20 @@ namespace config {
 /// Fixed => key generation is deterministic and runs are reproducible.
 constexpr uint32_t KEY_SEED = 65536;
 
-/// Number of packets per measurement window. Each window produces one CSV row
-/// per (algorithm, key_id, num_channels). The last partial window is dropped.
-/// 150k packets ~= 10 ms of a saturated 100 GbE link 
-constexpr uint32_t WINDOW_SIZE = 150000;
-
-/// How many independent random keys each keyed hash is evaluated with.
-constexpr std::size_t NUM_KEYS = 16;
-
 /// Length of an RSS key in bytes.
 constexpr std::size_t RSS_KEY_SIZE = 40;
 
-/// DMA channel counts under test. Powers of two and two non-powers (20, 40) —
-/// keep this ascending, the RETA_SIZE static_assert below reads the last element.
-constexpr std::array<int, 7> CHANNEL_COUNTS = {8, 16, 20, 32, 40, 64, 128};
-
 } // namespace config
 
+/// Bytes hashed per packet: src IP (16) + src port (2) + dst IP (16) + dst port (2).
+/// With IP only the ports are left out and the last 4 bytes stay zero.
 constexpr std::size_t TUPLE_SIZE = 36;
 
-#define RETA_ON 1
-
-#define IP_ONLY_ON 0
-
-#if IP_ONLY_ON 
-    constexpr std::size_t OFFSET = 16;
-#else 
-    constexpr std::size_t OFFSET = 18;
-#endif
-
-constexpr std::size_t RETA_SIZE = 128; //128/512
+/// Entries of the RSS indirection table (RETA). Must be a power of two (the
+/// index is the low bits of the hash) and caps the channel count at 128.
+constexpr std::size_t RETA_SIZE = 128;
 
 static_assert((RETA_SIZE & (RETA_SIZE - 1)) == 0,
               "RETA_SIZE must be a power of two - the index is a bit mask");
-static_assert(RETA_SIZE >= static_cast<std::size_t>(config::CHANNEL_COUNTS.back()),
-              "RETA_SIZE must be at least the largest channel count");
 
 #endif // CONFIG_HPP

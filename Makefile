@@ -1,8 +1,9 @@
 CXX := g++
-CXXFLAGS := -std=c++17 -Wall -Wextra -O3
+# -MMD -MP: remember which headers every .cpp includes, so changing a header rebuilds it
+CXXFLAGS := -std=c++17 -Wall -Wextra -O3 -MMD -MP -Isrc
 
 BUILD_DIR := build
-TARGET := benchmark
+TARGET := rss_sim
 
 SRCS := $(wildcard src/*.cpp) \
         $(wildcard src/wrappers/*.cpp) \
@@ -29,4 +30,6 @@ run: $(TARGET)
 	./$(TARGET) 
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET)
+	rm -rf $(BUILD_DIR) $(TARGET) benchmark
+
+-include $(OBJS:.o=.d)

@@ -108,7 +108,7 @@ static double parseFlowTimestamp(const std::string& ts) {
 // Column order:
 //   0 flowstart  1 flowend  2 srcip  3 srcport  4 dstip  5 dstport
 //   6 protocol   7 bytes    8 packets  9 bytes_rev  10 packets_rev
-FlowRow parseFlowLine(const std::string& line) {
+FlowRow parseFlowLine(const std::string& line, bool ip_only) {
     std::vector<std::string> f = splitCsvLine(line);
     if (f.size() != 11) {
         throw std::runtime_error("flow row does not have 11 fields");
@@ -118,13 +118,13 @@ FlowRow parseFlowLine(const std::string& line) {
     row.t_end       = parseFlowTimestamp(f[1]);
     if (row.t_end < row.t_start) row.t_end = row.t_start; // midnight wrap / bad data -> instant flow
 
-#if IP_ONLY_ON
-    row.fwd         = tuple32({ f[2],f[4]});   // src -> dst
-    row.rev         = tuple32({ f[4],f[2]});   // dst -> src (swapped for the reverse packets)
-#else 
-    row.fwd         = tuple37({ f[2], f[3], f[4], f[5], f[6] });   // src -> dst
-    row.rev         = tuple37({ f[4], f[5], f[2], f[3], f[6] });   // dst -> src (swapped for the reverse packets)
-#endif
+    if(ip_only) {
+        row.fwd         = tuple32({ f[2],f[4]});   // src -> dst
+        row.rev         = tuple32({ f[4],f[2]});   // dst -> src (swapped for the reverse packets)
+    }else {
+        row.fwd         = tuple37({ f[2], f[3], f[4], f[5], f[6] });   // src -> dst
+        row.rev         = tuple37({ f[4], f[5], f[2], f[3], f[6] });   // dst -> src (swapped for the reverse packets)
+    }
 
     row.bytes_fwd   = std::stoll(f[7]);
     row.packets_fwd = std::stoll(f[8]);

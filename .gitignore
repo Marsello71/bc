@@ -94,3 +94,4 @@ tests/golden/
 
 # Python cache
 __pycache__/
+/rss_sim

@@ -59,7 +59,7 @@ struct FlowRow {
  * Parse one 11-field flow CSV line into a FlowRow.
  * @throws std::runtime_error on a wrong field count or unparseable field
  */
-FlowRow parseFlowLine(const std::string& line);
+FlowRow parseFlowLine(const std::string& line, bool ip_only);
 
 #endif // PARSER_HPP
 

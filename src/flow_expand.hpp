@@ -26,7 +26,6 @@
 #include <istream>
 
 #include "config.hpp"
-#include "transform.hpp"
 
 /// What one packet adds to its channel's load.
 ///   Flow   - every flow direction is collapsed to ONE packet of weight 1
@@ -59,7 +58,7 @@ struct FlowInfo {
     int64_t weight;    // weight of each of those packets (see Weighting)
 };
 
-/// Called once per flow direction, with its (already symmetrised) tuple.
+/// Called once per flow direction, with its raw tuple (no symmetry yet).
 /// The caller does the expensive per-flow work here (hashing) and returns the
 /// token under which it stored the result.
 using FlowPrepare =
@@ -76,7 +75,9 @@ using FlowRelease = std::function<void(FlowToken token)>;
 
 /// Read flow rows from `in` and drive the three callbacks.
 /// Precondition: rows are sorted by flow start time.
-void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
+/// ip_only: hash only the IP addresses (the ports are left out of the tuple).
+/// The tuple handed to prepare() is raw - symmetry is a step of the RSS pipeline.
+void expandInterleaved(std::istream &in, bool ip_only,
                        Weighting weighting, const FlowPrepare &prepare,
                        const PacketSink &sink, const FlowRelease &release);
 

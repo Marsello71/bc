@@ -78,7 +78,7 @@ int64_t packetWeight(const ActiveFlow &f, Weighting w) {
 
 } // namespace
 
-void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
+void expandInterleaved(std::istream &in, bool ip_only,
                        Weighting weighting, const FlowPrepare &prepare,
                        const PacketSink &sink, const FlowRelease &release) {
     // min-heap of live flows, ordered by the time of each flow's NEXT packet.
@@ -109,7 +109,7 @@ void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
 
         FlowRow r;
         try {
-            r = parseFlowLine(line);
+            r = parseFlowLine(line, ip_only);
         } catch (const std::exception &e) {
             std::cerr << "Problem with the line: " << e.what() << "\n";
             continue;
@@ -120,8 +120,8 @@ void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
         // start before r, so every packet up to r.t_start is final and can go out now.
         while (!heap.empty() && heap.top().next_time <= r.t_start) emitTop();
 
-        // symmetry and hashing happen once here, not once per packet:
-        // prepare() gets the symmetrised tuple, the heap entry only keeps the token
+        // the RSS decision (symmetry, hash, channel) happens once here, not once per packet:
+        // prepare() gets the raw tuple, the heap entry only keeps the token
 
         // forward direction (Flow weighting collapses it to a single packet).
         // the entry is built first (token filled in below) so prepare() can be told
@@ -129,7 +129,7 @@ void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
         int64_t pf = (weighting == Weighting::Flow) ? 1 : r.packets_fwd;
         if (pf > 0) {
             ActiveFlow a{ 0, r.t_start, r.t_end, pf, r.bytes_fwd, 0, r.t_start };  // first packet at t_start
-            a.token = prepare(applySymmetry(sym, r.fwd, offset),
+            a.token = prepare(r.fwd,
                               FlowInfo{ a.t_start, a.t_end, a.packets_total, packetWeight(a, weighting) });
             heap.push(a);
         }
@@ -139,7 +139,7 @@ void expandInterleaved(std::istream &in, Symmetry sym, size_t offset,
                         ? (r.packets_rev > 0 ? 1 : 0) : r.packets_rev;
         if (pr > 0) {
             ActiveFlow b{ 0, r.t_start, r.t_end, pr, r.bytes_rev, 0, r.t_start };
-            b.token = prepare(applySymmetry(sym, r.rev, offset),
+            b.token = prepare(r.rev,
                               FlowInfo{ b.t_start, b.t_end, b.packets_total, packetWeight(b, weighting) });
             heap.push(b);
         }
