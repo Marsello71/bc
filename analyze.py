@@ -26,10 +26,19 @@ SURFACE = "#fcfcfb"
 
 # CSV column -> panel title
 METRICS = {
-    "overload": "Overload (‰), lower is better",
-    "fairness": "Jain fairness, higher is better",
-    "chi": "Normalised χ², lower is better",
+    "overload": "Overload (‰)",
+    "fairness": "Jain fairness",
+    "chi": "Normalised χ²",
 }
+
+# names from the config file -> names on the plot
+HASH_NAMES = {
+    "toeplitz": "Toeplitz", "jhash": "jhash", "chaskey": "Chaskey",
+    "halfsiphash": "HalfSipHash", "simpletab": "Simple tabulation",
+    "multiplyshift": "Multiply-shift", "siphash": "SipHash", "xorhash": "XOR hash",
+}
+TUPLE_NAMES = {"full": "full tuple", "ip": "IP-only tuple"}
+SYMMETRY_NAMES = {"none": "no symmetry", "xor": "XOR symmetry", "sort": "sorted symmetry"}
 
 
 def read_config(path):
@@ -55,12 +64,37 @@ def print_table(summary):
     print(table.round(4).to_string())
 
 
-def plot(summary, config, windows, output_path):
+def number(text):
+    """150000 -> 150 000"""
+    return f"{int(text):,}".replace(",", "\u202f")
+
+
+def plot_subtitle(config):
+    """The settings of this run, in one line."""
+    if config.get("scaling") == "on":
+        window = f"{number(config['can_size'])} packets per channel in a window"
+    else:
+        window = f"{number(config['window'])} packets in a window"
+    parts = [
+        Path(config["data"]).name,
+        TUPLE_NAMES[config.get("tuple", "full")],
+        SYMMETRY_NAMES[config.get("symmetry", "none")],
+        f"RETA {config.get('reta', 'on')}",
+        f"{config.get('weighting', 'packet')} weighting",
+        f"{config.get('keys', '16')} keys",
+        window,
+    ]
+    return "  ·  ".join(parts)
+
+
+def plot(summary, config, output_path):
     channels = sorted(summary["num_channels"].unique())
     positions = {n: i for i, n in enumerate(channels)}  # evenly spaced channel counts
-    labels = {"hash": config.get("hash", "hash"), "jsq": "JSQ oracle"}
+    hash_name = config.get("hash", "toeplitz")
+    hash_name = HASH_NAMES.get(hash_name, hash_name)
+    labels = {"hash": hash_name, "jsq": "JSQ oracle"}
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.6), facecolor=SURFACE)
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5), facecolor=SURFACE)
 
     for ax, (metric, title) in zip(axes, METRICS.items()):
         ax.set_facecolor(SURFACE)
@@ -86,15 +120,12 @@ def plot(summary, config, windows, output_path):
 
     handles, names = axes[0].get_legend_handles_labels()
     fig.legend(handles, names, loc="upper right", ncol=2, frameon=False,
-               labelcolor=TEXT, bbox_to_anchor=(0.995, 0.99))
+               labelcolor=TEXT, fontsize=11, bbox_to_anchor=(0.995, 0.985))
 
-    dataset = Path(config.get("data", "?")).name
-    fig.suptitle(
-        f"{dataset}: {config.get('tuple')} tuple, symmetry {config.get('symmetry')}, "
-        f"RETA {config.get('reta')}, {config.get('weighting')} weighting, "
-        f"{config.get('keys')} keys, {windows} windows of {config.get('window')} packets",
-        x=0.01, ha="left", color=TEXT, fontsize=12)
-    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    fig.text(0.012, 0.945, f"RSS load distribution: {hash_name} vs JSQ oracle",
+             color=TEXT, fontsize=15, fontweight="bold")
+    fig.text(0.012, 0.895, plot_subtitle(config), color=MUTED, fontsize=10.5)
+    fig.tight_layout(rect=(0, 0, 1, 0.87))
     fig.savefig(output_path, dpi=150, facecolor=SURFACE)
     plt.close(fig)
 
@@ -116,7 +147,7 @@ def main():
     print_table(summary)
 
     output_path = csv_path.with_suffix(".png")
-    plot(summary, config, data["window"].nunique(), output_path)
+    plot(summary, config, output_path)
     print(f"plot saved to {output_path}")
     return 0
 

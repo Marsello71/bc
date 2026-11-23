@@ -1,12 +1,13 @@
 #include "hash_register.hpp" 
 
 
-const std::array<hash_algoritm, 5> hash_functions_arr = {{
+const std::array<hash_algoritm, 8> hash_functions_arr = {{
         {"toeplitz", toeplitzRssWrapper},
         {"jhash", jhashlittleRssWrapper},
         {"chaskey", chaskeyRssWrapper},
         {"halfsiphash", halfSipHashRssWrapper},
-        {"simpletab",simpletabRssWrapper}
-        /* {"multiplyshift", multiplyShiftRssWrapper},
-        {"xorhash", xorHashRssWrapper} */
+        {"simpletab",simpletabRssWrapper},
+        {"multiplyshift", multiplyShiftRssWrapper},
+        {"siphash", sipHashRssWrapper},
+        {"xorhash", xorHashRssWrapper}
 }};

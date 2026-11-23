@@ -80,8 +80,6 @@ void Simulation::packet(FlowToken flow, int64_t weight) {
         jsq_hist_[c][jsq_slot[c]] += weight;            // add the packet to that channel
     }
 
-    // ... existing loops: count the packet for all keys and for JSQ ...
-
     for (std::size_t c = 0; c < NC; c++) {
         packets_in_window_[c]++;                       // one more packet in this window
         window_weight_[c] += weight;                   // and its load
