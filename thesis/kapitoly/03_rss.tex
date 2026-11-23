@@ -1,0 +1,96 @@
+% !TEX root = ../projekt.tex
+% =============================================================================
+% STAV: technický obsah hotový podľa simulátora, chýbajú citácie (bod 2 zadania).
+% =============================================================================
+\chapter{Mechanizmus RSS}
+\label{chap:rss}
+
+RSS rozhoduje o~kanáli každého paketu v~štyroch krokoch:
+
+\begin{enumerate}
+  \item z~hlavičky paketu zostaví vstup hashu (\emph{tuple}),
+  \item voliteľne ho upraví tak, aby oba smery toku dali rovnaký výsledok (\emph{symetria}),
+  \item vypočíta 32-bitový hash s~tajným kľúčom,
+  \item spodnými bitmi hashu vyberie položku tabuľky RETA, ktorá určí DMA kanál.
+\end{enumerate}
+
+\TODO{Obrázok tejto reťaze. Citácia pôvodnej špecifikácie RSS.}
+
+\section{Vstup hashu}
+\label{sec:tuple}
+
+Simulátor používa 36-bajtový vstup. IPv4 adresy sú uložené ako IPv4-mapované IPv6 adresy
+(\texttt{::ffff:a.b.c.d}), takže rovnaký formát pokrýva obe verzie IP.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \caption{Rozloženie 36-bajtového vstupu hashu.}
+  \label{tab:tuple}
+  \begin{tabular}{r l @{\qquad} r l}
+    \toprule
+    \multicolumn{2}{c}{Plný tuple} & \multicolumn{2}{c}{Iba IP} \\
+    Bajty & Pole & Bajty & Pole \\
+    \midrule
+    0--15  & zdrojová IP   & 0--15  & zdrojová IP \\
+    16--17 & zdrojový port & 16--31 & cieľová IP \\
+    18--33 & cieľová IP    & 32--35 & nuly \\
+    34--35 & cieľový port  &        & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Protokol do hashu nevstupuje. Porty sú zapísané v~sieťovom poradí bajtov.
+
+\section{Symetria}
+\label{sec:symetria}
+
+Bez symetrie majú dva smery toho istého spojenia rôzny tuple a môžu skončiť v~rôznych
+kanáloch. Aplikácie, ktoré spracúvajú celé spojenie, však potrebujú oba smery spolu.
+Simulátor porovnáva tri režimy:
+
+\begin{description}
+  \item[none] tuple sa nemení,
+  \item[xor] obe polovice sa nahradia hodnotou $\mathit{src} \oplus \mathit{dst}$,
+  \item[sort] väčšia polovica (porovnanie po bajtoch) ide vždy prvá.
+\end{description}
+
+Hranica polovíc je na offsete 18 pri plnom tuple a 16 pri variante iba s~IP.
+
+\section{Hashovacie funkcie}
+\label{sec:hashe}
+
+Referenčnou funkciou je Toeplitzov hash, štandard pre RSS. Porovnávali sa s~ním
+jhash (lookup3), Chaskey, HalfSipHash a jednoduchá tabelácia (\emph{simple tabulation}).
+Simulátor má navyše obálky pre multiply-shift (NH), SipHash a XOR hash.
+Každá funkcia sa hodnotí so 16 náhodnými 40-bajtovými kľúčmi s~pevným semienkom.
+
+\TODO{Ku každej funkcii 1 odsek: princíp, citácia, náročnosť v~HW. Skrátiť oproti pôvodnému
+zadaniu, hash už nie je hlavná téma.}
+
+\section{Tabuľka RETA}
+\label{sec:reta}
+
+RETA (\emph{redirection table}) je tabuľka, ktorá prevádza hash na kanál. Spodných
+7 bitov hashu vyberie jednu zo 128 položiek. Položka~$i$ je predvolene nastavená na kanál
+\begin{equation}
+  \mathit{kanal}(i) = i \bmod n .
+\end{equation}
+
+\paragraph{Kvantizácia RETA.}
+Ak $n$ nedelí 128, položky sa nedajú rozdeliť rovnomerne. Pri $n=20$ má 8 kanálov po
+7 položkách a 12 kanálov po 6. Pri $n=40$ má 8 kanálov po 4 položkách a 32 kanálov po 3.
+Aj dokonalý hash preto dáva nenulové preťaženie (definícia v~sekcii~\ref{sec:metriky}):
+\begin{align}
+  n=20: &\quad 8 \cdot \left(\tfrac{7}{128} - \tfrac{1}{20}\right) \cdot 1000 = 37{,}5\,\text{\textperthousand}, \\
+  n=40: &\quad 8 \cdot \left(\tfrac{4}{128} - \tfrac{1}{40}\right) \cdot 1000 = 50{,}0\,\text{\textperthousand}.
+\end{align}
+Namerané hodnoty pri váhe \texttt{flow} sú 38,2 a 51,3\,\textperthousand, teda takmer celé
+preťaženie pri týchto počtoch kanálov spôsobuje tabuľka, nie hash.
+
+\section{Hlavné obmedzenie RSS}
+
+RSS rozhoduje iba podľa hlavičky. Nevie, aký veľký tok je ani ako sú kanály práve
+zaťažené. Keďže celý tok ide do jedného kanála, jeden veľký tok (\emph{elephant flow})
+môže kanál preťažiť bez ohľadu na kvalitu hashu. Túto hypotézu overuje
+kapitola~\ref{chap:analyza}.

@@ -1,0 +1,59 @@
+% =====================================================================
+%  osnova-makra.tex
+%  Makrá na zobrazovanie pokynov v osnove.
+%
+%  AKO TO FUNGUJE:
+%  - kým píšeš, nechaj \osnovatrue  -> pokyny sa vysádzajú sivou farbou
+%  - pred odovzdaním daj \osnovafalse -> všetky pokyny zmiznú z PDF,
+%    text ostane v zdrojáku (nemusíš nič mazať)
+% =====================================================================
+
+\usepackage{xcolor}
+
+\newif\ifosnova
+\osnovatrue          % <<< PRED ODOVZDANÍM ZMEŇ NA \osnovafalse
+
+\definecolor{pokyntext}{RGB}{105,105,115}
+\definecolor{pokynlinka}{RGB}{180,180,190}
+\definecolor{pozorfarba}{RGB}{150,60,60}
+
+% --- základný blok pokynov: \begin{navod}{Nadpis} ... \end{navod} ----
+\newenvironment{navod}[1]
+  {\ifosnova
+     \par\medskip
+     \begingroup
+     \color{pokyntext}\small\sffamily
+     \begin{list}{}{%
+       \setlength{\leftmargin}{1.2em}%
+       \setlength{\rightmargin}{0.5em}%
+       \setlength{\itemindent}{0pt}%
+       \setlength{\listparindent}{0pt}%
+       \setlength{\parsep}{2pt}%
+       \setlength{\topsep}{2pt}}%
+     \item[]{\color{pozorfarba}\textbf{#1}}\par\vspace{2pt}%
+   \else
+     \begingroup\setbox0\vbox\bgroup
+   \fi}
+  {\ifosnova
+     \end{list}\endgroup\par\medskip
+   \else
+     \egroup\endgroup
+   \fi}
+
+% --- jednoriadkové skratky -------------------------------------------
+\newcommand{\rozsah}[1]{\ifosnova{\color{pokyntext}\small\sffamily\textbf{Rozsah:} #1\par\medskip}\fi}
+\newcommand{\pokyn}[1]{\ifosnova{\color{pokyntext}\small\sffamily #1\par\medskip}\fi}
+\newcommand{\pozor}[1]{\ifosnova{\color{pozorfarba}\small\sffamily\textbf{Pozor:} #1\par\medskip}\fi}
+
+% --- TODO priamo v texte (zostane viditeľné aj v „čistom“ režime, aby
+%     si ho pri finálnej kontrole nemohol prehliadnuť) ----------------
+% Poznámka: titulná strana šablóny sádže niektoré polia verzálkami, čím sa
+% \color{todored} zmení na \color{TODORED} — preto je farba definovaná
+% v oboch tvaroch. Nemaž ani jednu z nich.
+\definecolor{todored}{rgb}{0.80,0.10,0.10}
+\definecolor{TODORED}{rgb}{0.80,0.10,0.10}
+\DeclareRobustCommand{\TODO}[1]{{\color{todored}\textbf{[TODO: #1]}}}
+
+% --- pomocné makrá používané naprieč prácou ---------------------------
+\newcommand{\NDK}{NDK}
+\DeclareRobustCommand{\permille}{\textperthousand}

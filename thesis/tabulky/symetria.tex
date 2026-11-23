@@ -1,0 +1,17 @@
+% !TEX root = ../projekt.tex
+\begin{table}[ht]
+  \centering
+  \small
+  \caption{Zmena preťaženia Toeplitzu po zapnutí symetrie oproti \texttt{none}, cez 7 počtov kanálov.}
+  \label{tab:symetria}
+  \begin{tabular}{l rr rr}
+    \toprule
+    & \multicolumn{2}{c}{XOR} & \multicolumn{2}{c}{sort} \\
+    Váha & priemer [\%] & rozsah [\%] & priemer [\%] & rozsah [\%] \\
+    \midrule
+    flow & +18,1 & +1,5 až +25,0 & +18,3 & +1,3 až +26,3 \\
+    packet & +14,3 & +11,8 až +16,4 & +16,7 & +12,2 až +20,1 \\
+    byte & +2,0 & -0,4 až +3,6 & +4,4 & +2,4 až +6,9 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

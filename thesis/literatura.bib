@@ -1,0 +1,157 @@
+% =====================================================================
+%  literatura.bib
+%
+%  Štartovací zoznam zdrojov. VŠETKY údaje si over v origináli
+%  (najmä strany, ročníky a DOI) — v bakalárke sa kontroluje aj forma
+%  citácií. Pri online zdrojoch je povinný dátum prístupu.
+%
+%  Odporúčanie: cieľ je 25--35 zdrojov, z toho aspoň 10 recenzovaných
+%  (konferencie, časopisy). Samé blogy a dokumentácie sú slabina, ktorú
+%  oponenti komentujú.
+% =====================================================================
+
+% ---------- RSS, rozdeľovanie záťaže ---------------------------------
+
+@misc{microsoft-rss,
+  author       = {{Microsoft}},
+  title        = {Introduction to Receive Side Scaling},
+  howpublished = {Online: Windows Drivers documentation},
+  url          = {https://learn.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-receive-side-scaling},
+  note         = {[cit. DOPLNIT-DATUM-PRISTUPU]}
+}
+
+@misc{linux-scaling,
+  author       = {{The Linux Kernel Developers}},
+  title        = {Scaling in the {L}inux Networking Stack},
+  howpublished = {Online: Linux kernel documentation},
+  url          = {https://www.kernel.org/doc/Documentation/networking/scaling.txt},
+  note         = {[cit. DOPLNIT-DATUM-PRISTUPU]}
+}
+
+@misc{dpdk-thash,
+  author       = {{DPDK Project}},
+  title        = {Toeplitz Hash Library},
+  howpublished = {Online: DPDK Programmer's Guide},
+  url          = {https://doc.dpdk.org/guides/prog_guide/toeplitz_hash_lib.html},
+  note         = {[cit. DOPLNIT-DATUM-PRISTUPU]}
+}
+
+@inproceedings{cao2000,
+  author    = {Cao, Zhiruo and Wang, Zheng and Zegura, Ellen},
+  title     = {Performance of Hashing-Based Schemes for {I}nternet Load Balancing},
+  booktitle = {Proceedings IEEE INFOCOM 2000},
+  year      = {2000},
+  pages     = {332--341},
+  doi       = {10.1109/INFCOM.2000.832203}
+}
+
+@article{shi2005,
+  author  = {Shi, Weiguang and MacGregor, Mike H. and Gburzynski, Pawel},
+  title   = {Load Balancing for Parallel Forwarding},
+  journal = {IEEE/ACM Transactions on Networking},
+  volume  = {13},
+  number  = {4},
+  pages   = {790--801},
+  year    = {2005},
+  doi     = {10.1109/TNET.2005.852881}
+}
+
+% ---------- metriky ---------------------------------------------------
+
+@techreport{jain1984,
+  author      = {Jain, Rajendra K. and Chiu, Dah-Ming W. and Hawe, William R.},
+  title       = {A Quantitative Measure of Fairness and Discrimination for
+                 Resource Allocation in Shared Computer Systems},
+  institution = {Digital Equipment Corporation},
+  number      = {DEC-TR-301},
+  year        = {1984}
+}
+
+% ---------- hashovacie funkcie ---------------------------------------
+
+@inproceedings{chaskey,
+  author    = {Mouha, Nicky and Mennink, Bart and Van Herrewege, Anthony and
+               Watanabe, Dai and Preneel, Bart and Verbauwhede, Ingrid},
+  title     = {Chaskey: An Efficient {MAC} Algorithm for 32-bit Microcontrollers},
+  booktitle = {Selected Areas in Cryptography -- SAC 2014},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {8781},
+  pages     = {306--323},
+  publisher = {Springer},
+  year      = {2014},
+  doi       = {10.1007/978-3-319-13051-4_19}
+}
+
+@inproceedings{siphash,
+  author    = {Aumasson, Jean-Philippe and Bernstein, Daniel J.},
+  title     = {{SipHash}: A Fast Short-Input {PRF}},
+  booktitle = {Progress in Cryptology -- INDOCRYPT 2012},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {7668},
+  pages     = {489--508},
+  publisher = {Springer},
+  year      = {2012},
+  doi       = {10.1007/978-3-642-34931-7_28}
+}
+
+@inproceedings{nh-umac,
+  author    = {Black, John and Halevi, Shai and Krawczyk, Hugo and
+               Krovetz, Ted and Rogaway, Phillip},
+  title     = {{UMAC}: Fast and Secure Message Authentication},
+  booktitle = {Advances in Cryptology -- CRYPTO'99},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {1666},
+  pages     = {216--233},
+  publisher = {Springer},
+  year      = {1999},
+  doi       = {10.1007/3-540-48405-1_14}
+}
+
+@article{dietzfelbinger1997,
+  author  = {Dietzfelbinger, Martin and Hagerup, Torben and
+             Katajainen, Jyrki and Penttonen, Martti},
+  title   = {A Reliable Randomized Algorithm for the Closest-Pair Problem},
+  journal = {Journal of Algorithms},
+  volume  = {25},
+  number  = {1},
+  pages   = {19--51},
+  year    = {1997},
+  doi     = {10.1006/jagm.1997.0873}
+}
+
+@misc{jenkins-lookup3,
+  author       = {Jenkins, Bob},
+  title        = {A Hash Function for Hash Table Lookup ({lookup3})},
+  howpublished = {Online},
+  url          = {https://burtleburtle.net/bob/hash/doobs.html},
+  note         = {[cit. DOPLNIT-DATUM-PRISTUPU]}
+}
+
+% ---------- NDK a CESNET ---------------------------------------------
+
+@misc{ndk-doc,
+  author       = {{CESNET}},
+  title        = {Network Development Kit ({NDK}) Documentation},
+  howpublished = {Online},
+  url          = {https://DOPLNIT-URL-DOKUMENTACIE-NDK},
+  note         = {[cit. DOPLNIT-DATUM-PRISTUPU]}
+}
+
+@misc{ndk-github,
+  author       = {{CESNET}},
+  title        = {ndk-app-minimal: Minimal {NDK} Application},
+  howpublished = {Online: GitHub},
+  url          = {https://github.com/CESNET/ndk-app-minimal},
+  note         = {[cit. DOPLNIT-DATUM-PRISTUPU]}
+}
+
+% ---------- ďalšie zdroje, ktoré sa oplatí dohľadať -------------------
+%
+%  DOPLNIT: doplň ešte aspoň:
+%   - datasheet použitej FPGA (zdroje, DSP, BRAM),
+%   - článok o HW implementácii hashovacích funkcií na FPGA,
+%   - článok o objemných tokoch (elephant flows) a ich detekcii,
+%   - zdroj k symetrickému RSS (napr. Woo & Park, „Scalable hardware
+%     based symmetric RSS“ alebo ekvivalent — over presnú citáciu),
+%   - zdroj k charakteristike prevádzky v akademických sieťach,
+%   - normu / dokument k DMA a PCIe priepustnosti.

@@ -1,0 +1,39 @@
+% !TEX root = ../projekt.tex
+% =====================================================================
+%  PRÍLOHA A — OBSAH PAMÄŤOVÉHO MÉDIA
+% =====================================================================
+\chapter{Obsah priloženého pamäťového média}
+\label{app:medium}
+
+\rozsah{0,5--1 strana. Povinná príloha — over si aktuálne požiadavky
+fakulty na štruktúru odovzdávaného archívu.}
+
+\pokyn{Vypíš stromovú štruktúru archívu a pri každom adresári jednu vetu,
+čo obsahuje. Odporúčaná štruktúra:}
+
+\begin{verbatim}
+/
+|-- text/        zdrojove subory prace (LaTeX) a vysledne PDF
+|-- src/         evaluacny nastroj (zdrojove kody, requirements)
+|-- rtl/         VHDL zdrojove kody rozsirenej RSS komponenty
+|-- data/        vzorka vstupnych dat (alebo odkaz, ak sa nesmu zverejnit)
+|-- results/     vysledne CSV subory a vygenerovane grafy
+|-- scripts/     skripty na zopakovanie experimentov
+`-- README.md    navod na spustenie
+\end{verbatim}
+
+\pozor{Pred odovzdaním uprac repozitár:
+\begin{itemize}
+  \item \texttt{README.md} je zastaraný (37\,B tuple, 64\,B kľúč, staré
+        stĺpce a staré algoritmy) — musí zodpovedať finálnemu stavu,
+  \item zmaž zvyšky \texttt{results/t.csv} a \texttt{resultsoverload\_comparison.png},
+  \item \texttt{run.sh} odkazuje na neexistujúci \texttt{data/odid1.csv},
+  \item \texttt{analyze.py:191} má pokazený nadpis grafu,
+  \item oprav preklep \texttt{thresshold\_sum} $\rightarrow$ \texttt{threshold\_sum}.
+\end{itemize}
+Oponent si archív otvorí a skúsi spustiť \texttt{run.sh}. Ak to spadne
+na prvom riadku, poznačí si to.}
+
+\pokyn{Ak sa dáta CESNET nesmú zverejniť, napíš to sem explicitne a priloži
+aspoň malú anonymizovanú vzorku alebo generátor syntetických dát, aby sa
+nástroj dal spustiť aj bez nich.}

@@ -1,0 +1,33 @@
+% !TEX root = ../projekt.tex
+% =============================================================================
+% STAV: pracovný podklad. Prepísať vlastnými slovami, doplniť citácie.
+% =============================================================================
+\chapter{Úvod}
+\label{chap:uvod}
+
+Rýchlosť počítačových sietí rastie rýchlejšie než výkon jedného jadra procesora.
+Pri rýchlostiach 100\,Gb/s a viac už jedno jadro nestíha spracovať všetky prijaté
+pakety, preto sieťová karta rozdeľuje prevádzku do viacerých DMA kanálov a každý
+kanál obsluhuje iné jadro. \TODO{citácia a konkrétne čísla: čas na jeden paket pri 100\,Gb/s}
+
+Štandardným mechanizmom tohto rozdelenia je \emph{Receive Side Scaling} (RSS).
+Z~hlavičky paketu vypočíta hash a podľa neho vyberie DMA kanál. Všetky pakety jedného
+toku tak skončia v~tom istom kanáli, čo zachová ich poradie. Cenou za túto vlastnosť je
+nerovnomerná záťaž: toky majú veľmi rozdielnu veľkosť a kanál, na ktorý padne niekoľko
+veľkých tokov, je preťažený, zatiaľ čo iné kanály majú voľnú kapacitu.
+
+Cieľom práce je navrhnúť a analyzovať varianty distribúcie paketov do DMA kanálov
+jednotkou RSS frameworku NDK, vyvíjaného združením CESNET. Práca uvažuje úpravy, ktoré
+zachovávajú pravidlo ,,jeden tok = jeden kanál``, aj úpravy, ktoré rozdeľujú pakety
+jedného toku na podmnožinu kanálov. Na ich vyhodnotenie vznikol simulátor jednotky RSS
+pre najviac 128 DMA kanálov, ktorý pracuje so vzorkami reálnej sieťovej prevádzky.
+
+\TODO{Sem patrí 2--3 vety o hlavnom výsledku, až keď budú hotové varianty z~kapitoly~\ref{chap:vyhodnotenie}.}
+
+\paragraph{Štruktúra práce.}
+Kapitola~\ref{chap:ndk} predstavuje platformu NDK. Kapitola~\ref{chap:rss} popisuje
+mechanizmus RSS. Kapitola~\ref{chap:metodika} zavádza metriky a metodiku merania
+a kapitola~\ref{chap:simulator} implementovaný simulátor. Kapitola~\ref{chap:analyza}
+analyzuje východiskové RSS a ukazuje, čo jeho nerovnomernosť spôsobuje.
+Kapitola~\ref{chap:varianty} navrhuje varianty úprav, kapitola~\ref{chap:vyhodnotenie}
+ich vyhodnocuje a kapitola~\ref{chap:zaver} prácu uzatvára.

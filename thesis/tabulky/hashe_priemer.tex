@@ -1,0 +1,24 @@
+% !TEX root = ../projekt.tex
+\begin{table}[ht]
+  \centering
+  \small
+  \caption{Preťaženie [\textperthousand] hashovacích funkcií na \texttt{odid1}: priemer cez 7 počtov kanálov, 16 kľúčov a všetky okná. Tučne je najnižšia hodnota v~riadku.}
+  \label{tab:hashe-priemer}
+  \begin{tabular}{l l rrrrr}
+    \toprule
+    Symetria & Váha & Toeplitz & jhash & Chaskey & HalfSipHash & simple tab. \\
+    \midrule
+    none & flow & \textbf{20,9} & 20,9 & 21,0 & 21,0 & 21,0 \\
+    none & packet & 106,4 & 106,1 & \textbf{105,0} & 107,4 & 107,9 \\
+    none & byte & 145,9 & 145,6 & \textbf{144,3} & 147,4 & 147,0 \\
+    \midrule
+    XOR & flow & 23,1 & 23,1 & 23,1 & 23,1 & \textbf{23,1} \\
+    XOR & packet & 121,7 & 121,5 & 121,4 & 121,5 & \textbf{120,7} \\
+    XOR & byte & 148,9 & 148,7 & 148,9 & 149,1 & \textbf{147,8} \\
+    \midrule
+    sort & flow & 23,1 & \textbf{23,1} & 23,2 & 23,2 & 23,1 \\
+    sort & packet & 123,5 & 121,4 & \textbf{120,1} & 121,7 & 122,7 \\
+    sort & byte & 151,6 & 148,5 & \textbf{146,8} & 149,5 & 149,9 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

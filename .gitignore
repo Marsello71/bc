@@ -1,97 +1,51 @@
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
+# C++ build
+build/
 *.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-*.so.*
-
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
+*.d
 *.a
-*.lib
-
-# Executables
+*.so
+*.so.*
+*.dylib
 *.exe
 *.out
-*.app
-
-# Build directories
-build/
-Build/
-build-*/
-
-# CMake generated files (out-of-source build, so no Makefile lands at root)
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-install_manifest.txt
-compile_commands.json
-
-# built binary (placed at repo root, see CMakeLists.txt)
+/rss_sim
 /benchmark
 
-# Temporary files
-*.tmp
-*.log
-*.bak
-*.swp
+# Python
+venv
+__pycache__/
 
-# vcpkg
-vcpkg_installed/
-
-# debug information files
-*.dwo
-
-# test output & cache
-Testing/
-.cache/
-
-.gitignore
-.claude
-graphify-out
-.DS_Store
-
+# Data and simulation results (big, can be generated again)
 data/
 *.csv
-
-venv
-
-results1/
-results2/
-results4/
-results6/
-ip_res1/
+!tests/data/*.csv
+results/
 super_results/
 
-# test outputs (regenerated, never committed)
-tests/out/
-tests/out_extra/
+# Test outputs
+tests/out*/
 tests/golden/
 
-# Python cache
-__pycache__/
-/rss_sim
+# Thesis: LaTeX files, normally written to thesis/build/
+thesis/*.aux
+thesis/*.bbl
+thesis/*.blg
+thesis/*.fdb_latexmk
+thesis/*.fls
+thesis/*.lof
+thesis/*.lot
+thesis/*.ptc
+thesis/*.synctex.gz
+thesis/*.toc
+thesis/projekt.pdf
+
+# Editor, system and temporary files
+.vscode/
+.claude
+.cache/
+.DS_Store
+graphify-out
+*.log
+*.tmp
+*.bak
+*.swp

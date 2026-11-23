@@ -122,7 +122,7 @@ def plot(summary, config, output_path):
     fig.legend(handles, names, loc="upper right", ncol=2, frameon=False,
                labelcolor=TEXT, fontsize=11, bbox_to_anchor=(0.995, 0.985))
 
-    fig.text(0.012, 0.945, f"RSS load distribution: {hash_name} vs JSQ oracle",
+    fig.text(0.012, 0.945, f"RSS load distribution: {hash_name} vs JSQ",
              color=TEXT, fontsize=15, fontweight="bold")
     fig.text(0.012, 0.895, plot_subtitle(config), color=MUTED, fontsize=10.5)
     fig.tight_layout(rect=(0, 0, 1, 0.87))

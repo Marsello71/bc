@@ -1,0 +1,22 @@
+% !TEX root = ../projekt.tex
+% =============================================================================
+% STAV: rozpracované, dopísať po vyhodnotení variantov (bod 6 zadania).
+% =============================================================================
+\chapter{Záver}
+\label{chap:zaver}
+
+Práca sa zaoberala distribúciou paketov do DMA kanálov jednotkou RSS frameworku NDK. Vznikol
+simulátor jednotky RSS pre najviac 128 kanálov, ktorý pracuje so záznamami reálnej prevádzky
+a záťaž hodnotí preťažením, Jainovým indexom a normalizovaným $\chi^2$.
+
+Analýza vzorky \texttt{odid1} ukázala, že nerovnomernú záťaž nespôsobuje kvalita hashu, ale
+rozdielna veľkosť tokov. Medzi piatimi hashovacími funkciami sa nepreukázal rozdiel väčší než
+vplyv náhodného kľúča, slabšia funkcia sa však môže prejaviť pri vstupe s~nízkou entropiou. Referenčné orákulum, ktoré zachováva afinitu toku, znížilo preťaženie
+oproti Toeplitzu o~63 až 88\,\% pri váhach packet a byte, čo ukazuje veľkú rezervu v~spôsobe
+výberu kanála.
+
+\TODO{Doplniť výsledky navrhnutých variantov a odporúčanie pre NDK.}
+
+\paragraph{Možnosti pokračovania.}
+\TODO{Napríklad implementácia najlepšej varianty vo VHDL, meranie na reálnom hardvéri,
+vyhodnotenie na paketových stopách namiesto tokových záznamov.}

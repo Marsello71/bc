@@ -1,0 +1,24 @@
+% !TEX root = ../projekt.tex
+% =============================================================================
+% STAV: hotové podľa aktuálneho kódu.
+% =============================================================================
+\chapter{Návod na spustenie simulátora}
+\label{app:manual}
+
+\section*{Preklad a spustenie}
+\begin{lstlisting}
+make                      # build rss_sim
+./run.sh                  # simulation + table + plot, uses config.conf
+./run.sh my_test.conf     # the same with another config
+./rss_sim config.conf     # simulation only
+\end{lstlisting}
+
+\section*{Výstup}
+Výsledkom je súbor CSV podľa kľúča \texttt{out} a graf s~rovnakým menom a príponou \texttt{.png}.
+\begin{lstlisting}
+method,window,num_channels,overload,fairness,chi
+hash,1,8,110.914,0.922365,0.0851074
+\end{lstlisting}
+Riadky \texttt{hash} sú priemerom cez všetky kľúče. Orákulum \texttt{jsq} kľúče nepoužíva.
+
+\TODO{Doplniť závislosti (kompilátor C++17, Python, pandas, matplotlib) a popis všetkých kľúčov.}

@@ -1,0 +1,269 @@
+%==============================================================================
+% Bakalárska práca — FIT VUT v Brne
+% Analýza hashovacích funkcií pre mechanizmus RSS na FPGA sieťovej karte
+%
+% Postavené na oficiálnej šablóne FIT VUT (2008 Michal Bidlo, 2022 Jaroslav
+% Dytrych, 2025 Petr Veigend). Kontakt na správcu šablóny: sablona@fit.vutbr.cz
+%
+% Kompilácia: pdfLaTeX + BibTeX (v Overleafe stačí Recompile)
+% Z konzoly:  make    (viď Makefile)
+%==============================================================================
+% POZNÁMKY K ÚPRAVÁM OPROTI ORIGINÁLU:
+%  - trieda je nastavená na slovenčinu: \documentclass[slovak]{fitthesis}
+%  - text práce je rozdelený do súborov kapitoly/*.tex a prilohy/*.tex
+%    namiesto pôvodných projekt-01-kapitoly-chapters.tex a
+%    projekt-30-prilohy-appendices.tex
+%  - pridaný \input{osnova-makra} — makrá na zobrazovanie pokynov v osnove
+%    (pred odovzdaním prepni v tom súbore \osnovatrue na \osnovafalse)
+%  - anglická vetva (\ifenglish) bola odstránená, práca je po slovensky
+%==============================================================================
+
+\documentclass[slovak]{fitthesis}          % bez zadania — pre priebežnú prácu
+%\documentclass[slovak,zadani]{fitthesis}  % <<< PRED ODOVZDANÍM: vloží zadani.pdf
+%\documentclass[slovak,zadani,print]{fitthesis}  % čiernobiela tlač
+%\documentclass[slovak,zadani,cprint]{fitthesis} % farebná tlač, čierne odkazy
+
+% Základné balíčky sú v súbore fitthesis.cls (okrem iného graphicx, amsmath,
+% amssymb, booktabs, listings, xcolor, enumitem, todonotes).
+% Tu pridávame len to, čo v šablóne nie je:
+\usepackage{siunitx}      % jednotky a čísla (\SI, \num) — ak nepoužiješ, zmaž
+\usepackage{subcaption}   % podobrázky (\begin{subfigure}) — ak nepoužiješ, zmaž
+
+% Nastavenie cesty k obrázkom / Setting of a path to the pictures
+\graphicspath{{obrazky-figures/}{./obrazky-figures/}}
+
+%---rm---------------
+\renewcommand{\rmdefault}{lmr}%zavede Latin Modern Roman jako rm
+%---sf---------------
+\renewcommand{\sfdefault}{qhv}%zavede TeX Gyre Heros jako sf
+%---tt------------
+\renewcommand{\ttdefault}{lmtt}% zavede Latin Modern tt jako tt
+
+% vypne funkciu šablóny, ktorá automaticky nahrádza úvodzovky
+\csdoublequotesoff
+
+\usepackage{url}
+
+% =======================================================================
+% balíček "hyperref" musí byť uvedený ako posledný, preto nemôže byť v šablóne
+\ifWis
+\ifx\pdfoutput\undefined % nejedeme pod pdflatexem
+\else
+  \usepackage{color}
+  \usepackage[unicode,colorlinks,hyperindex,plainpages=false,pdftex]{hyperref}
+  \definecolor{hrcolor-ref}{RGB}{223,52,30}
+  \definecolor{hrcolor-cite}{HTML}{2F8F00}
+  \definecolor{hrcolor-urls}{HTML}{092EAB}
+  \hypersetup{
+	linkcolor=hrcolor-ref,
+	citecolor=hrcolor-cite,
+	filecolor=magenta,
+	urlcolor=hrcolor-urls
+  }
+  \def\pdfBorderAttrs{/Border [0 0 0] }
+  \pdfcompresslevel=9
+\fi
+\else % pre tlač budú odkazy čierne
+\ifx\pdfoutput\undefined
+\else
+  \usepackage{color}
+  \usepackage[unicode,colorlinks,hyperindex,plainpages=false,pdftex,urlcolor=black,linkcolor=black,citecolor=black]{hyperref}
+  \definecolor{links}{rgb}{0,0,0}
+  \definecolor{anchors}{rgb}{0,0,0}
+  \def\AnchorColor{anchors}
+  \def\LinkColor{links}
+  \def\pdfBorderAttrs{/Border [0 0 0] }
+  \pdfcompresslevel=9
+\fi
+\fi
+% Riešenie problému, keď klikacie odkazy na obrázky vedú za obrázok
+\usepackage[all]{hypcap}
+
+% Makrá na pokyny v osnove (pred odovzdaním: \osnovafalse v osnova-makra.tex)
+\input{osnova-makra}
+
+
+% Informácie o práci / Information about the thesis
+%---------------------------------------------------------------------------
+\projectinfo{
+  %Praca / Thesis
+  project={BP},            % typ práce BP/SP/DP/DR
+  year={2026},             % rok odovzdania
+  date=\today,             % dátum odovzdania
+  %Nazov prace / thesis title
+  title.cs={Návrh a analýza variantov distribúcie paketov do DMA kanálov jednotkou RSS frameworku NDK},
+  title.en={Design and Analysis of Packet Distribution Variants for the RSS Unit of the NDK Framework},
+  %title.length={14.5cm},   % odkomentuj, ak sa titulok zle zalamuje
+  %sectitle.length={14.5cm},
+  %dectitle.length={14.5cm},
+  %Autor / Author
+  author.name={Marcel},
+  author.surname={Kopták},
+  %author.title.p={Bc.},
+  %author.title.a={},
+  %Ustav / Department
+  department={UPSY},       % Ústav počítačových systémov — over podľa zadania
+  % Školiteľ / supervisor
+  supervisor.name={Jiří},
+  supervisor.surname={Matoušek},
+  supervisor.title.p={Ing.},
+  supervisor.title.a={Ph.D.},
+  % Školiteľ špecialista (nevypĺňa sa pri BP)
+  specialist.name={},
+  specialist.surname={},
+  specialist.title.p={},
+  specialist.title.a={},
+  % Klúčové slová / keywords
+  keywords.cs={RSS, Receive Side Scaling, DMA kanály, rozloženie záťaže, RETA, Toeplitz, veľké toky, simulácia, FPGA, sieťová karta, NDK, CESNET},
+  keywords.en={RSS, Receive Side Scaling, DMA channels, load balancing, RETA, Toeplitz, elephant flows, simulation, FPGA, network interface card, NDK, CESNET},
+  % Abstrakt / Abstract
+  % ---------------------------------------------------------------------
+  % POKYN: abstrakt píš až na konci, 150--200 slov, v tomto poradí:
+  %  (1) kontext — vysokorýchlostné FPGA karty a platforma NDK združenia CESNET
+  %  (2) problém — nerovnomerná záťaž DMA kanálov pri distribúcii jednotkou RSS
+  %  (3) čo si urobil — simulátor do 128 kanálov, metriky, varianty úprav RSS,
+  %      analýza nad vzorkami reálnej prevádzky CESNET
+  %  (4) hlavný výsledok — hash nerozhoduje, veľké toky áno; orákulum JSQ znižuje
+  %      preťaženie o 63--88 %; doplniť výsledok najlepšej varianty
+  %  (5) prínos — odporúčanie pre jednotku RSS v NDK
+  % ---------------------------------------------------------------------
+  abstract.cs={\TODO{abstrakt v slovenčine — štruktúru nájdeš v komentári nad týmto riadkom}},
+  abstract.en={\TODO{doslovný preklad slovenského abstraktu; nechaj si ho jazykovo skontrolovať}},
+  % Prehlásenie
+  % POZOR: šablóna 2025 vyžaduje uviesť použité nástroje umelej inteligencie.
+  % Upravte podľa skutočnosti — príklad je nižšie.
+  declaration={Prehlasujem, že som túto bakalársku prácu vypracoval samostatne pod vedením pána \TODO{meno vedúceho}.
+Ďalšie informácie mi poskytli \TODO{konzultanti, napr. z~CESNETu -- alebo vetu zmažte}.
+Uviedol som všetky literárne pramene, publikácie a ďalšie zdroje, z~ktorých som čerpal.
+\TODO{Ak ste použili nástroje umelej inteligencie, uveďte ich konkrétne, napr.: Pre jazykovú revíziu technickej správy som použil nástroj X. Pri tvorbe programového kódu som využíval nástroj Y.}},
+  % Poďakovanie (nepovinné — ak nechceš, celý riadok zakomentuj)
+  acknowledgment={\TODO{Poďakovanie vedúcemu práce, prípadne konzultantom z~CESNETu za poskytnutie datasetov a prístup k~hardvéru. 2--4 vety.}},
+  % Rozšírený abstrakt (cca 3 normostrany) — pri BP sa spravidla nevyžaduje
+  %extendedabstract={},
+  %extabstract.odd={true},
+  faculty.cs={Fakulta informačních technologií},
+  faculty.en={Faculty of Information Technology},
+  department.cs={Ústav počítačových systémů},
+  department.en={Department of Computer Systems}
+}
+
+% rieši prvý/posledný riadok odseku na predchádzajúcej/nasledujúcej strane
+\clubpenalty=10000
+\widowpenalty=10000
+
+% checklist
+\newlist{checklist}{itemize}{1}
+\setlist[checklist]{label=$\square$}
+
+\begin{document}
+  % Vysadenie titulných strán / Typesetting of the title pages
+  % ----------------------------------------------
+  \maketitle
+  % Obsah
+  % ----------------------------------------------
+  \setlength{\parskip}{0pt}
+
+  {\hypersetup{hidelinks}\tableofcontents}
+
+  % Zoznam obrázkov a tabuliek
+  \ifczech
+    \renewcommand\listfigurename{Seznam obrázků}
+  \fi
+  \ifslovak
+    \renewcommand\listfigurename{Zoznam obrázkov}
+  \fi
+  {\hypersetup{hidelinks}\listoffigures}
+
+  \ifczech
+    \renewcommand\listtablename{Seznam tabulek}
+  \fi
+  \ifslovak
+    \renewcommand\listtablename{Zoznam tabuliek}
+  \fi
+  {\hypersetup{hidelinks}\listoftables}
+
+  \ifODSAZ
+    \setlength{\parskip}{0.5\bigskipamount}
+  \else
+    \setlength{\parskip}{0pt}
+  \fi
+
+  % vynechanie strany v obojstrannom režime
+  \iftwoside
+    \cleardoublepage
+  \fi
+
+  % Text práce / Thesis text
+  % ----------------------------------------------
+  \input{kapitoly/01_uvod}
+  \input{kapitoly/02_ndk}
+  \input{kapitoly/03_rss}
+  \input{kapitoly/04_metriky_a_metodika}
+  \input{kapitoly/05_simulator}
+  \input{kapitoly/06_analyza_rss}
+  \input{kapitoly/07_navrh_variant}
+  \input{kapitoly/08_vyhodnotenie_variant}
+  \input{kapitoly/09_zaver}
+
+  % Použitá literatúra / Bibliography
+  % ----------------------------------------------
+\ifslovak
+  \makeatletter
+  \def\@openbib@code{\addcontentsline{toc}{chapter}{Literatúra}}
+  \makeatother
+  \bibliographystyle{bib-styles/Pysny/skplain}
+\else
+  \ifczech
+    \makeatletter
+    \def\@openbib@code{\addcontentsline{toc}{chapter}{Literatura}}
+    \makeatother
+    \bibliographystyle{bib-styles/Pysny/czplain}
+  \else
+    \makeatletter
+    \def\@openbib@code{\addcontentsline{toc}{chapter}{Bibliography}}
+    \makeatother
+    \bibliographystyle{bib-styles/Pysny/enplain}
+  \fi
+\fi
+  \begin{flushleft}
+  \nocite{*} % TEMPORARY: lists all entries until the chapters have real citations
+  \bibliography{literatura}
+  \end{flushleft}
+
+  % vynechanie strany v obojstrannom režime
+  \iftwoside
+    \cleardoublepage
+  \fi
+
+  % Prílohy / Appendices
+  % ---------------------------------------------
+  \appendix
+\ifczech
+  \renewcommand{\appendixpagename}{Přílohy}
+  \renewcommand{\appendixtocname}{Přílohy}
+  \renewcommand{\appendixname}{Příloha}
+\fi
+\ifslovak
+  \renewcommand{\appendixpagename}{Prílohy}
+  \renewcommand{\appendixtocname}{Prílohy}
+  \renewcommand{\appendixname}{Príloha}
+\fi
+
+  \startcontents[chapters]
+  \setlength{\parskip}{0pt}
+
+  \ifODSAZ
+    \setlength{\parskip}{0.5\bigskipamount}
+  \else
+    \setlength{\parskip}{0pt}
+  \fi
+
+  \iftwoside
+    \cleardoublepage
+  \fi
+
+  \input{prilohy/A_obsah_media}
+  \input{prilohy/B_doplnkove_grafy}
+  \input{prilohy/C_manual}
+
+\end{document}

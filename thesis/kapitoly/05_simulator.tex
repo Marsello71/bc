@@ -1,0 +1,107 @@
+% !TEX root = ../projekt.tex
+% =============================================================================
+% STAV: hotové podľa aktuálneho kódu (bod 3 zadania, 2. časť).
+% =============================================================================
+\chapter{Simulátor jednotky RSS}
+\label{chap:simulator}
+
+Simulátor \texttt{rss\_sim} je napísaný v~C++17. Na zachytenej prevádzke simuluje
+jednotku RSS s~najviac 128 DMA kanálmi a pre každé okno vyhodnotí záťaž kanálov.
+Zámerne oddeľuje \emph{rozhodovanie} (RSS) od \emph{merania}, aby nová varianta RSS
+nemohla ovplyvniť spôsob merania.
+
+\section{Architektúra}
+
+\begin{table}[ht]
+  \centering
+  \small
+  \caption{Hlavné časti simulátora.}
+  \label{tab:subory}
+  \begin{tabular}{l p{9.5cm}}
+    \toprule
+    Súbor & Úloha \\
+    \midrule
+    \texttt{settings}    & načítanie konfiguračného súboru \\
+    \texttt{parser}      & prevod riadku CSV na tuple a počty paketov \\
+    \texttt{flow\_expand} & rekonštrukcia prúdu paketov v~čase (halda) \\
+    \texttt{rss}         & reťaz RSS: symetria, hash, RETA alebo modulo, orákulum JSQ \\
+    \texttt{simulation}  & rozhodnutia tokov, počítanie paketov, okná, zápis výsledkov \\
+    \texttt{metrics}     & preťaženie, Jainov index, $\chi^2$ \\
+    \texttt{wrappers/}   & jednotné rozhranie ôsmich hashovacích funkcií \\
+    \texttt{analyze.py}  & súhrnná tabuľka a graf \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Beh sa nastavuje jediným súborom:
+
+\begin{lstlisting}
+data      = data/odid1.csv
+out       = results/result.csv
+hash      = toeplitz        # jhash chaskey halfsiphash simpletab ...
+tuple     = full            # ip
+symmetry  = none            # xor sort
+reta      = on              # off
+scaling   = on              # off = fixed window
+weighting = packet          # flow byte
+keys      = 16
+channels  = 8 16 20 32 40 64 128
+window    = 150000          # used when scaling = off
+can_size  = 18750           # packets per channel, scaling = on
+\end{lstlisting}
+
+\section{Priebeh simulácie}
+
+Generátor prúdu paketov volá simulátor v~troch momentoch:
+
+\begin{enumerate}
+  \item \textbf{Začiatok toku.} Simulátor pridelí toku pamäťový slot. Reťaz RSS vypočíta
+        kanál pre každý kľúč a počet kanálov (16~$\times$~7 = 112 hodnôt) a orákulum JSQ
+        vyberie svoj kanál.
+  \item \textbf{Paket.} Simulátor iba prečíta uložené kanály a pripočíta váhu paketu do
+        histogramov. Hash sa pri pakete nepočíta. Keď sa okno daného počtu kanálov naplní,
+        vypočítajú sa metriky, zapíše sa riadok výsledkov a vynulujú sa počítadlá tohto
+        počtu kanálov.
+  \item \textbf{Koniec toku.} Slot sa uvoľní pre ďalší tok, takže pamäť závisí od počtu
+        súčasne živých tokov, nie od ich celkového počtu.
+\end{enumerate}
+
+\section{Orákulum JSQ}
+\label{sec:jsq}
+
+Orákulum \emph{Join the Shortest Queue} (JSQ) slúži ako \textbf{dolná hranica}: ukazuje, čo
+sa dá dosiahnuť pri zachovaní pravidla ,,jeden tok = jeden kanál``, ak by jednotka poznala
+veľkosť a trvanie toku už pri jeho začiatku. V~hardvéri sa takto realizovať nedá.
+
+Nový tok ide do kanála s~najmenšou očakávanou záťažou na konci aktuálneho okna:
+\begin{equation}
+  \mathit{ch} = \arg\min_{i} \left( h_i + t_\mathit{left} \cdot r_i \right) ,
+\end{equation}
+kde $h_i$ je záťaž doručená v~tomto okne, $r_i$ súčet rýchlostí živých tokov na kanáli a
+$t_\mathit{left}$ odhad času do konca okna (chýbajúce pakety delené rýchlosťou všetkých živých
+tokov). Toky kratšie než 1\,ms sa do rýchlostí nezapočítavajú.
+
+Skúšali sme štyri verzie (syntetické dáta, váha \texttt{packet}, porovnanie s~Toeplitzom):
+
+\begin{description}
+  \item[A] kumulatívna záťaž od začiatku: horšie než hash o~4--10\,\%,
+  \item[B] záťaž aktuálneho okna: $-19$\,\% pri 8 kanáloch, $+1$\,\% pri 128,
+  \item[C] najmenej aktívnych tokov: približne ako hash,
+  \item[D] doručená záťaž a očakávaný zvyšok (vzorec vyššie): $-23$\,\% pri 8 kanáloch,
+        $-5$\,\% pri 128. Túto verziu sme ponechali.
+\end{description}
+
+\section{Overenie správnosti}
+
+Pri prepise simulátora sa výsledky porovnávali s~pôvodnou implementáciou:
+
+\begin{itemize}
+  \item na malom testovacom datasete všetkých 180 kombinácií (5 hashov, 2 tuple,
+        3 symetrie, RETA zap./vyp., 3 váhy), spolu 108\,360 riadkov,
+  \item na celom \texttt{odid1} 212\,660 riadkov (15\,190 okien, 7 počtov kanálov, Toeplitz a JSQ).
+\end{itemize}
+
+Najväčší relatívny rozdiel bol menší než $10^{-5}$ a pochádza zo zaokrúhlenia uložených
+hodnôt pri priemerovaní cez kľúče. Hodnoty JSQ na \texttt{odid1} sa zhodovali presne.
+
+\TODO{Doplniť čas behu a spotrebu pamäte na \texttt{odid1}.}

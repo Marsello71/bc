@@ -1,0 +1,21 @@
+% !TEX root = ../projekt.tex
+\begin{table}[ht]
+  \centering
+  \small
+  \caption{Toeplitz bez symetrie, pevné okno 150\,000 paketov, \texttt{odid1}: priemer cez 16 kľúčov a všetky okná.}
+  \label{tab:toeplitz-vahy}
+  \begin{tabular}{r rr rr rr}
+    \toprule
+    & \multicolumn{2}{c}{flow} & \multicolumn{2}{c}{packet} & \multicolumn{2}{c}{byte} \\
+    Kanály & [\textperthousand] & Jain & [\textperthousand] & Jain & [\textperthousand] & Jain \\
+    \midrule
+    8 & 5,5 & 1,000 & 52,3 & 0,981 & 72,0 & 0,965 \\
+    16 & 7,6 & 0,999 & 73,3 & 0,962 & 101,0 & 0,932 \\
+    20 & 38,2 & 0,993 & 86,3 & 0,950 & 116,3 & 0,912 \\
+    32 & 10,4 & 0,999 & 99,6 & 0,929 & 139,4 & 0,873 \\
+    40 & 51,3 & 0,983 & 122,4 & 0,900 & 162,2 & 0,836 \\
+    64 & 14,0 & 0,998 & 134,4 & 0,870 & 187,4 & 0,779 \\
+    128 & 19,0 & 0,995 & 176,5 & 0,774 & 243,2 & 0,645 \\
+    \bottomrule
+  \end{tabular}
+\end{table}

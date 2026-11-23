@@ -1,0 +1,97 @@
+% !TEX root = ../projekt.tex
+% =============================================================================
+% STAV: návrhy a nápady (bod 4 zadania). Implementované je iba to, čo je
+% v tabuľke označené. Ostatné je plán, nie výsledok.
+% =============================================================================
+\chapter{Návrh variantov jednotky RSS}
+\label{chap:varianty}
+
+Analýza ukázala, že hash nie je úzkym miestom. Varianty sa preto zameriavajú na to,
+\emph{ako sa z~hashu alebo zo stavu kanálov určí kanál}. Podľa zadania sa delia do dvoch skupín.
+
+\begin{table}[ht]
+  \centering
+  \small
+  \caption{Prehľad variantov a ich aktuálny stav.}
+  \label{tab:varianty}
+  \begin{tabular}{l l l}
+    \toprule
+    Varianta & Afinita toku & Stav \\
+    \midrule
+    A1 Iná hashovacia funkcia     & áno & vyhodnotené, bez prínosu \\
+    A2 Symetria                   & áno & vyhodnotené, má cenu \\
+    A3 Väčšia RETA                & áno & návrh \\
+    A4 Úprava hashu (digest)      & áno & návrh \\
+    A5 RETA podľa záťaže          & áno & návrh \\
+    A6 Orákulum JSQ               & áno & hotové, dolná hranica \\
+    \midrule
+    B1 Skupiny susedných kanálov  & nie & návrh \\
+    B2 Flowlety                   & nie & návrh \\
+    B3 Dva hashe a výber v~podmnožine & nie & návrh \\
+    B4 Rozdelenie iba veľkých tokov & nie & návrh \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Varianty so zachovaním afinity toku}
+
+\subsection*{A1: Iná hashovacia funkcia}
+Vyhodnotené v~sekciách~\ref{sec:hash-nezalezi} až~\ref{sec:statistika}. Medzi kvalitnými funkciami
+sa prínos nepreukázal. Slabšia funkcia môže pri vstupe s~nízkou entropiou výsledok zhoršiť
+(sekcia~\ref{sec:dalsie-vzorky}).
+
+\subsection*{A2: Symetria}
+Vyhodnotené v~sekcii~\ref{sec:cena-symetrie}. Je to funkčná požiadavka s~merateľnou cenou,
+nie optimalizácia.
+
+\subsection*{A3: Väčšia tabuľka RETA}
+Odstraňuje kvantizáciu pri počtoch kanálov, ktoré nedelia veľkosť tabuľky. Pri 512 položkách
+klesne teoretické preťaženie dokonalého hashu z~37,5 na 9,4\,\textperthousand{} ($n=20$)
+a z~50,0 na 12,5\,\textperthousand{} ($n=40$). \TODO{Zistiť cenu v~pamäti FPGA.}
+
+\subsection*{A4: Úprava hashu pred výberom položky}
+Medzi hash a RETA sa vloží lacná operácia, napríklad zmiešanie horných bitov do spodných
+($h \oplus (h \gg 16)$). \emph{Očakávanie:} vzhľadom na výsledky A1 skôr malý prínos, je to však
+najlacnejšia zmena.
+
+\subsection*{A5: Plnenie RETA podľa záťaže}
+Položky RETA sa medzi oknami presúvajú z~preťažených kanálov na menej zaťažené. Hardvér meria
+záťaž položiek a tabuľku preprogramuje. Je to realizovateľná aproximácia orákula.
+\TODO{Otvorené: ako často meniť tabuľku a čo s~tokmi, ktoré sa pri zmene presunú
+(krátkodobé preusporiadanie paketov).}
+
+\emph{Dopad na simulátor:} kanál sa dnes určí raz pri štarte toku. Pre A5 sa musí pre tok uložiť
+položka RETA a kanál určovať až pri skladaní okna.
+
+\subsection*{A6: Orákulum JSQ}
+Popísané v~sekcii~\ref{sec:jsq}. Nie je to návrh pre hardvér, ale referencia, s~ktorou sa
+porovnávajú ostatné varianty.
+
+\section{Varianty rozdeľujúce tok na podmnožinu kanálov}
+
+Tieto varianty útočia priamo na príčinu z~sekcie~\ref{sec:slony}: veľký tok už nemusí celý
+zaťažiť jeden kanál. \textbf{Cenou je možné preusporiadanie paketov toku}, preto k~nim treba
+pridať novú metriku. \TODO{Navrhnúť metriku preusporiadania a overiť s~vedúcim, koľko kanálov
+v~skupine je prijateľných pre aplikácie.}
+
+\subsection*{B1: Skupiny susedných kanálov}
+Hash vyberie skupinu susedných kanálov a pakety toku sa v~nej striedajú (\emph{round robin}).
+Pôvodný nápad: skupiny po 2 kanáloch pri 8 kanáloch a po 3 až 6 pri 128 kanáloch, lebo hardvér
+vie susedné kanály prepojiť.
+
+\subsection*{B2: Flowlety}
+Tok sa rozdelí v~medzerách medzi paketmi väčších než zvolený prah a každá časť sa hashuje zvlášť.
+\emph{Obmedzenie simulátora:} pakety sú v~toku rozložené rovnomerne, takže skutočné medzery
+nevidí. Na túto variantu by bola potrebná paketová stopa. \TODO{Zvážiť, či ju vôbec zaradiť.}
+
+\subsection*{B3: Dva hashe a výber v~podmnožine}
+Hash určí podmnožinu $k$ kanálov a v~nej sa pre paket vyberie kanál druhým mechanizmom:
+striedaním, druhým hashom alebo podľa najmenšej záťaže.
+
+\subsection*{B4: Rozdelenie iba veľkých tokov}
+Malé toky zostávajú v~jednom kanáli, rozdelia sa iba toky, ktoré počas behu prekročia prah.
+Väčšina tokov sa teda nepreusporiada a záťaž veľkých tokov sa rozloží.
+
+\emph{Dopad na simulátor pre skupinu B:} kanál sa musí vyberať pre každý paket, nie raz pre tok.
+
+\TODO{Vybrať 3--4 varianty, ktoré sa naozaj implementujú. Návrh: A3, A5, B1, B4.}

@@ -1,0 +1,326 @@
+% !TEX root = ../projekt.tex
+% =============================================================================
+% STAV: výsledky na odid1 sú hotové. Chýbajú ďalšie vzorky (bod 5 zadania).
+% Všetky čísla pochádzajú zo super_results/ (pevné okno) a results/baseline.csv
+% (dynamické okno, Toeplitz, packet, bez symetrie).
+% =============================================================================
+\chapter{Analýza východiskového RSS}
+\label{chap:analyza}
+
+Táto kapitola odpovedá na otázku, \emph{čo spôsobuje nerovnomernú záťaž kanálov}. Od odpovede
+závisí, ktoré úpravy z~kapitoly~\ref{chap:varianty} majú zmysel.
+
+Ak nie je uvedené inak, výsledky sú z~\texttt{odid1} s~plným tuple, RETA so 128 položkami,
+16 kľúčmi a pevným oknom 150\,000 paketov (15\,190 okien pri váhach \texttt{packet}
+a \texttt{byte}, 287 pri \texttt{flow}).
+
+\section{Príčinou sú veľké toky}
+\label{sec:slony}
+
+\input{tabulky/toeplitz_vahy}
+
+Tabuľka~\ref{tab:toeplitz-vahy} ukazuje ten istý hash pri troch spôsoboch počítania záťaže.
+Keď má každý tok rovnakú váhu, je rozdelenie takmer dokonalé: pri 128 kanáloch je preťaženie
+19,0\,\textperthousand{} a Jainov index 0,995. Keď sa započíta skutočný počet paketov alebo
+bajtov, preťaženie stúpne na 176,5, resp. 243,2\,\textperthousand{} a Jainov index klesne na
+0,774, resp. 0,645.
+
+Hash teda rozdeľuje \emph{toky} rovnomerne. Nerovnomerná je \emph{prevádzka}, lebo toky majú
+veľmi rozdielnu veľkosť. Preťaženie navyše rastie s~počtom kanálov: čím menší je spravodlivý
+podiel jedného kanála, tým väčšiu časť z~neho zaberie jeden veľký tok.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{analyza/elephant_evidence.png}
+  \caption{Preťaženie spriemerované cez všetky hashe pri troch váhach (logaritmická os).
+  Špičky pri 20 a 40 kanáloch vo váhe flow spôsobuje kvantizácia RETA.
+  \TODO{Prekresliť so slovenskými popismi.}}
+  \label{fig:slony}
+\end{figure}
+
+\section{Porovnanie hashovacích funkcií}
+\label{sec:hash-nezalezi}
+
+Porovnávalo sa päť funkcií: Toeplitz, jhash, Chaskey, HalfSipHash a jednoduchá tabelácia.
+Každá so 16 kľúčmi, tromi režimami symetrie, tromi váhami a siedmimi počtami kanálov, teda
+5\,040 kombinácií na vzorke \texttt{odid1}.
+
+\input{tabulky/hashe_priemer}
+
+Tabuľka~\ref{tab:hashe-priemer} ukazuje, že po spriemerovaní cez počty kanálov sú funkcie
+veľmi blízko seba. Pri váhe \texttt{flow} sa líšia najviac o~0,1\,\textperthousand, pri váhach
+\texttt{packet} a \texttt{byte} o~jednotky promile. Žiadna funkcia nie je najlepšia
+vo všetkých režimoch.
+
+\input{tabulky/hashe_odchylky}
+
+\subsection{Bez symetrie}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{hashe/overload_none.png}
+  \caption{Preťaženie piatich hashovacích funkcií bez symetrie (hore) a ich pomer
+  k~Toeplitzu (dole), \texttt{odid1}. \TODO{Prekresliť so slovenskými popismi.}}
+  \label{fig:hashe}
+\end{figure}
+
+Na obrázku~\ref{fig:hashe} sa krivky funkcií v~hornom riadku takmer prekrývajú. Spodný riadok
+rozdiely zväčšuje: priemerná odchýlka od Toeplitzu je 0,5\,\% (flow), 1,6\,\% (packet)
+a 1,2\,\% (byte). Najväčší rozdiel je pri 8 kanáloch a váhe \texttt{packet}, kde je Chaskey
+o~7,0\,\% \emph{lepší} než Toeplitz. Väčšina odchýlok nemá stabilný smer: napríklad jhash je
+pri váhe \texttt{packet} a 8 kanáloch lepší než Toeplitz, ale pri 16 kanáloch horší. Rozdiely sa navyše s~rastúcim počtom
+kanálov zmenšujú a pri 128 kanáloch sú všetky funkcie do približne 1\,\% od Toeplitzu.
+
+Pri váhe \texttt{flow} sú krivky prakticky totožné a výrazné špičky pri 20 a 40 kanáloch majú
+všetky funkcie rovnaké, lebo ich spôsobuje RETA (sekcia~\ref{sec:reta}).
+
+\subsection{Symetria XOR}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{hashe/overload_xorfold.png}
+  \caption{Porovnanie funkcií pri symetrii XOR, \texttt{odid1}.
+  \TODO{Prekresliť so slovenskými popismi.}}
+  \label{fig:hashe-xor}
+\end{figure}
+
+Pri symetrii XOR (obrázok~\ref{fig:hashe-xor}) sú funkcie najbližšie k~sebe. Priemerná
+odchýlka je 0,6 až 0,8\,\% a najväčšia 3,2\,\%.
+
+\subsection{Symetria sort}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{hashe/overload_sortfold.png}
+  \caption{Porovnanie funkcií pri symetrii sort, \texttt{odid1}.
+  \TODO{Prekresliť so slovenskými popismi.}}
+  \label{fig:hashe-sort}
+\end{figure}
+
+Symetria sort je jediný režim, kde sa objavuje náznak systematického rozdielu
+(obrázok~\ref{fig:hashe-sort}). Pri váhach \texttt{packet} a \texttt{byte} má Toeplitz
+v~priemere najvyššie preťaženie a ostatné funkcie sú pri väčšine počtov kanálov pod ním. Chaskey
+je pri 16 kanáloch lepší až o~9,1\,\%. Rozdiel sa s~rastúcim počtom kanálov opäť stráca.
+\TODO{Overiť väčším počtom kľúčov, či je to skutočný efekt kombinácie Toeplitz + sort, alebo
+náhoda. Toeplitz je lineárny, takže tu môže existovať vysvetlenie.}
+
+\section{Vplyv RSS kľúča}
+\label{sec:kluce}
+
+Aby sa dalo posúdiť, či sú rozdiely medzi funkciami významné, treba ich porovnať s~tým, ako
+veľmi sa mení výsledok \emph{tej istej} funkcie pri inom náhodnom kľúči.
+
+\input{tabulky/kluce}
+
+Tabuľka~\ref{tab:kluce} ukazuje, že kľúč má väčší vplyv než výber funkcie pri každom počte
+kanálov: rozpätie medzi kľúčmi je 3,9 až 12,4-krát väčšie pri váhe \texttt{packet} a 4,6 až
+14,4-krát pri váhe \texttt{byte}. Pri malom počte kanálov je vplyv kľúča veľký aj absolútne.
+Toeplitz s~8 kanálmi má pri váhe \texttt{packet} podľa kľúča preťaženie od 41,9 do
+71,3\,\textperthousand, teda jeho najhorší kľúč je o~70\,\% horší než najlepší. Pravdepodobným dôvodom je, že pri
+málo kanáloch rozhoduje, či najväčšie toky padnú do toho istého kanála.
+\TODO{Overiť: pozrieť, kam padnú najväčšie toky pri najlepšom a najhoršom kľúči.}
+
+\begin{figure}[p]
+  \centering
+  \begin{subfigure}{0.54\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{kluce/keys_8.png}
+    \caption{8 kanálov}
+  \end{subfigure}
+
+  \begin{subfigure}{0.54\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{kluce/keys_40.png}
+    \caption{40 kanálov}
+  \end{subfigure}
+
+  \begin{subfigure}{0.54\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{kluce/keys_128.png}
+    \caption{128 kanálov}
+  \end{subfigure}
+  \caption{Rozptyl preťaženia medzi 16 kľúčmi pri váhe \texttt{flow}, \texttt{odid1}. Škatuľa
+  je 25.--75.~percentil, fúzy sú najlepší a najhorší kľúč. Každý panel má vlastnú os Y.
+  \TODO{Prekresliť so slovenskými popismi.}}
+  \label{fig:kluce}
+\end{figure}
+
+Obrázok~\ref{fig:kluce} zobrazuje rozloženie cez kľúče pri váhe \texttt{flow}, kde sa meria čistá
+kvalita hashu bez vplyvu veľkých tokov. Škatule všetkých funkcií sa vo všetkých režimoch
+prekrývajú, takže podľa rozloženia cez kľúče nemožno žiadnu funkciu označiť za lepšiu.
+Pozor na mierku: pri 8 kanáloch je celý rozsah Toeplitzu bez symetrie iba 5,3 až
+5,7\,\textperthousand{} a pri 128 kanáloch 18,8 až 19,4\,\textperthousand.
+
+\emph{Poznámka:} výber ,,najlepšieho`` kľúča na tých istých dátach by bol zavádzajúci. Dobrý
+kľúč je výhodný preto, ako práve rozdelil konkrétne veľké toky, a na inej prevádzke výhodu stratí.
+\TODO{Dalo by sa overiť: vybrať najlepší kľúč na jednej vzorke a zmerať ho na inej.}
+
+\section{Štatistické vyhodnotenie}
+\label{sec:statistika}
+
+\begin{itemize}
+  \item \textbf{Kľúč oproti funkcii.} Cez všetkých 63 konfigurácií (3 symetrie, 3 váhy, 7 počtov
+        kanálov) je rozpätie medzi kľúčmi v~mediáne 6,6-krát väčšie než rozpätie medzi
+        funkciami (od 3,1 do 23,1-krát).
+  \item \textbf{Permutačný test.} Hodnoty kľúčov sme náhodne premiešali medzi funkciami
+        (3\,000 permutácií) a testovali, či je skutočný rozdiel funkcií väčší než náhodný.
+        $p<0{,}05$ vyšlo v~4 z~63 konfigurácií, čisto náhodou by sa očakávali približne 3.
+        Žiadna konfigurácia nemá $p<0{,}01$. Všetky štyri sú pri symetrii \emph{sort}, čo
+        zodpovedá náznaku z~obrázka~\ref{fig:hashe-sort}.
+  \item \textbf{Podiel vysvetleného rozptylu.} Voľba funkcie vysvetľuje najviac približne
+        14\,\% rozptylu výsledkov ($\eta^2$, obrázok~\ref{fig:spread}), väčšinou menej než 10\,\%.
+\end{itemize}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{hashe/spread.png}
+  \caption{Podiel rozptylu vysvetlený voľbou hashovacej funkcie ($\eta^2$), \texttt{odid1}.
+  \TODO{Prekresliť so slovenskými popismi.}}
+  \label{fig:spread}
+\end{figure}
+
+\paragraph{Záver porovnania.} Na vzorke \texttt{odid1} s~plným tuple sa medzi piatimi funkciami
+nepreukázal rozdiel, ktorý by prevýšil vplyv náhodného kľúča. Výmena kvalitného hashu preto
+nerieši nerovnomernú záťaž. Sekcia~\ref{sec:dalsie-vzorky} ukazuje dôležitú výnimku:
+slabšia funkcia môže byť horšia, keď má vstup málo entropie. Ďalšie experimenty používajú Toeplitz.
+
+\section{Cena symetrie}
+\label{sec:cena-symetrie}
+
+\input{tabulky/symetria}
+
+Symetria zlúči oba smery spojenia do jedného kanála, čím vznikajú väčšie jednotky záťaže.
+Podľa tabuľky~\ref{tab:symetria} zvyšuje preťaženie pri váhach \texttt{flow} a \texttt{packet}
+priemerne o~14 až 18\,\%, pri váhe \texttt{byte} iba o~2 až 4\,\%.
+\TODO{Vysvetliť, prečo je cena pri bajtoch nižšia. Hypotéza: bajty sú v~jednom smere toku,
+ten druhý k~záťaži pridá málo. Treba overiť na dátach.}
+
+\section{Vplyv tabuľky RETA}
+
+Pri 20 a 40 kanáloch tvorí preťaženie vo váhe \texttt{flow} takmer výlučne kvantizácia RETA
+(sekcia~\ref{sec:reta}): teoreticky 37,5 a 50,0\,\textperthousand, namerané 38,2 a
+51,3\,\textperthousand. Pri mocninách dvoch tento efekt neexistuje.
+
+\section{Koľko sa dá získať pri zachovaní afinity toku}
+\label{sec:hranica}
+
+\input{tabulky/jsq}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{analyza/jsq_vs_toeplitz.png}
+  \caption{Preťaženie Toeplitzu a orákula JSQ pri pevnom okne, \texttt{odid1}.}
+  \label{fig:jsq}
+\end{figure}
+
+Orákulum JSQ (sekcia~\ref{sec:jsq}) stále posiela celý tok do jedného kanála, ale vyberá ho
+podľa záťaže. Oproti Toeplitzu znižuje preťaženie o~71 až 88\,\% pri váhe \texttt{packet}
+a o~63 až 83\,\% pri váhe \texttt{byte} (tabuľka~\ref{tab:jsq}). Pri 128 kanáloch stúpne
+Jainov index z~0,774 na 0,949 (packet) a z~0,645 na 0,893 (byte).
+
+Z~toho vyplývajú dva závery:
+
+\begin{enumerate}
+  \item \textbf{Veľká rezerva je v~politike výberu kanála, nie v~hashi.} Funkcie sa líšia
+        o~jednotky percent, lepšie priradenie tokov dokáže odstrániť väčšinu preťaženia.
+  \item \textbf{Zvyšok je cena afinity.} Aj orákulum má pri 128 kanáloch
+        50,3\,\textperthousand{} (packet) a 89,4\,\textperthousand{} (byte). Toto preťaženie
+        sa pri pravidle ,,jeden tok = jeden kanál`` už znižuje ťažko, čo motivuje varianty
+        rozdeľujúce tok na viac kanálov.
+\end{enumerate}
+
+\emph{Obmedzenia:} orákulum pozná budúcnosť toku, takže ide o~dolnú hranicu, nie realizovateľný
+návrh. Nepoužíva RETA, preto časť jeho výhody pri 20 a 40 kanáloch tvorí iba chýbajúca kvantizácia.
+
+\section{Vplyv veľkosti okna}
+\label{sec:vplyv-okna}
+
+\input{tabulky/dynamicke_okno}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=0.9\textwidth]{analyza/pevne_vs_dynamicke_okno.png}
+  \caption{Pevné a dynamické okno, váha packet, \texttt{odid1}.}
+  \label{fig:okno}
+\end{figure}
+
+Pri pevnom okne dostane jeden kanál pri 128 kanáloch 16-krát menej paketov než pri 8.
+Mohlo by sa preto zdať, že rast preťaženia s~počtom kanálov je iba artefakt merania.
+Tabuľka~\ref{tab:dynamicke-okno} ukazuje, že na \texttt{odid1} to tak \textbf{nie je}: pri
+128 kanáloch klesne preťaženie Toeplitzu po prechode na dynamické okno iba zo 176,5 na
+172,9\,\textperthousand{} (približne 2\,\%) a orákula z~50,3 na 45,0\,\textperthousand.
+Rast preťaženia je teda vlastnosťou prevádzky, nie dĺžky okna.
+
+\emph{Poznámka:} na malom syntetickom datasete (\texttt{flow\_big}, približne 883 súbežných
+smerov tokov) bol vplyv okna oveľa väčší (662 oproti 391\,\textperthousand). Výsledok preto
+závisí od počtu súbežných tokov a treba ho overiť na ďalších vzorkách.
+
+\section{Ďalšie vzorky prevádzky}
+\label{sec:dalsie-vzorky}
+
+Porovnanie funkcií prebehlo aj na vzorkách \texttt{odid2}, \texttt{odid4} a \texttt{odid6} a na
+\texttt{odid1} s~hashovaním iba IP adries. Všetky grafy sú v~prílohe~\ref{app:grafy}.
+
+\textbf{Pozor na rozdiely oproti predošlým sekciám:} tieto behy pochádzajú zo staršej verzie
+kódu a namiesto jednoduchej tabelácie obsahujú multiply-shift (NH). Surové výsledky sa neuložili,
+preto sú čísla v~tabuľke~\ref{tab:vzorky} iba \emph{orientačne odčítané z~grafov}.
+\TODO{Prepočítať novým simulátorom a nahradiť presnými hodnotami.}
+
+\begin{table}[ht]
+  \centering
+  \small
+  \caption{Toeplitz na rôznych vzorkách, váha \texttt{packet}, bez symetrie, pevné okno.
+  Okrem \texttt{odid1} (plný tuple) sú hodnoty orientačne odčítané z~grafov.}
+  \label{tab:vzorky}
+  \begin{tabular}{l r r l}
+    \toprule
+    Vzorka & 8 kanálov [\textperthousand] & 128 kanálov [\textperthousand] & Najväčšia odchýlka funkcie od Toeplitzu \\
+    \midrule
+    \texttt{odid1} (plný tuple) & 52   & 177  & 7\,\% (Chaskey, lepší) \\
+    \texttt{odid2}              & 70   & 240  & 7,5\,\% (multiply-shift, horší) \\
+    \texttt{odid4}              & 185  & 525  & 1,6\,\% (multiply-shift, lepší) \\
+    \texttt{odid6}              & 115  & 280  & 1,3\,\% \\
+    \texttt{odid1} (iba IP)     & 65   & 220  & 12\,\% (multiply-shift, horší) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Z~porovnania vzoriek vyplývajú tri pozorovania:
+
+\begin{enumerate}
+  \item \textbf{Úroveň preťaženia závisí od prevádzky.} Medzi vzorkami sa líši približne
+        3,5-násobne (pri 8 kanáloch 52 až 185\,\textperthousand). Rast s~počtom kanálov majú
+        všetky vzorky.
+  \item \textbf{Kvalitné funkcie zostávajú blízko seba.} Toeplitz, jhash, Chaskey a HalfSipHash
+        sa pri váhe \texttt{packet} líšia najviac o~jednotky percent na každej vzorke.
+  \item \textbf{Slabšia funkcia sa môže prejaviť pri vstupe s~nízkou entropiou.} Pri hashovaní iba IP
+        adries je multiply-shift horší než Toeplitz konzistentne pri všetkých počtoch kanálov:
+        približne o~6--12\,\% (packet), 6--11\,\% (byte) a 4--16\,\% (flow). Menší náznak je aj
+        na \texttt{odid2} (do 7,5\,\%). Výber hashu teda nie je úplne ľubovoľný.
+        \TODO{Príčinu (nízka entropia vstupu) sme zatiaľ neoverili, je to hypotéza.}
+\end{enumerate}
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth]{ostatne_vzorky/odid1_ip_only/overload_none.png}
+  \caption{Hashovanie iba IP adries, \texttt{odid1}, staršia verzia kódu s~funkciou multiply-shift.
+  V~spodnom riadku je vidno, že multiply-shift je pri všetkých váhach nad Toeplitzom.}
+  \label{fig:ip-only}
+\end{figure}
+
+Hashovanie iba IP adries navyše zvyšuje samotné preťaženie: pri 128 kanáloch a váhe \texttt{flow}
+je približne 57\,\textperthousand{} oproti 19,0\,\textperthousand{} pri plnom tuple
+(obrázok~\ref{fig:ip-only}), lebo všetky toky medzi tou istou dvojicou adries skončia v~jednom kanáli.
+
+\section{Zhrnutie}
+
+\begin{enumerate}
+  \item Nerovnomernú záťaž spôsobuje rozdielna veľkosť tokov, nie kvalita hashu.
+  \item Medzi kvalitnými hashmi sa nepreukázal rozdiel väčší než vplyv kľúča. Slabá funkcia
+        (multiply-shift) však môže byť horšia pri vstupe s~nízkou entropiou.
+  \item Kľúč má pri malom počte kanálov veľký vplyv: pri 8 kanáloch 42 až 71\,\textperthousand.
+  \item Symetria stojí 14--18\,\% pri váhach flow a packet, 2--4\,\% pri bajtoch.
+  \item Pri počtoch kanálov, ktoré nedelia 128, pridáva preťaženie aj tabuľka RETA.
+  \item Lepší výber kanála pri zachovaní afinity by mohol odstrániť 63--88\,\% preťaženia.
+  \item Dĺžka okna výsledky na \texttt{odid1} takmer nemení.
+\end{enumerate}

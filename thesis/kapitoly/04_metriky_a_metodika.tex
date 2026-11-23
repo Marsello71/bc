@@ -1,0 +1,99 @@
+% !TEX root = ../projekt.tex
+% =============================================================================
+% STAV: hotové podľa kódu, doplniť citácie metrík (bod 3 zadania, 1. časť).
+% =============================================================================
+\chapter{Metriky a metodika merania}
+\label{chap:metodika}
+
+\section{Dáta}
+\label{sec:data}
+
+Vstupom sú záznamy tokov zo siete CESNET v~CSV s~11 stĺpcami: začiatok a koniec toku,
+zdrojová a cieľová IP adresa a port, protokol a počty bajtov a paketov v~oboch smeroch.
+Hlavným vzorkom je \texttt{odid1}: približne 35 miliónov záznamov, ktoré po rozvinutí
+dávajú približne 2,28 miliardy paketov a súčasne až približne 782 tisíc živých smerov tokov.
+
+\TODO{Doplniť: odkiaľ dáta sú, kedy a na akej linke boli zachytené, priemerná rýchlosť v~Gb/s.}
+
+\paragraph{Známe vlastnosti dát.}
+\begin{itemize}
+  \item \textbf{Zrkadlené duplicity.} \texttt{odid1} obsahuje zrkadlené záznamy tokov
+        (približne 12\,\% riadkov a 42\,\% paketov). Na výreze dát nadhodnocovali preťaženie
+        o~2--4\,\%, poradie funkcií nemenili. Výsledky v~tejto práci sú zatiaľ
+        \textbf{s~duplicitami}. \TODO{Rozhodnúť: finálne čísla na \texttt{odid1\_dedup}, alebo to uviesť ako obmedzenie.}
+  \item \textbf{Okrajový efekt.} Na začiatku záznamu chýbajú už bežiace toky a na konci
+        zostávajú iba dlhé toky. Pri Toeplitze, váhe \texttt{packet} a 32 kanáloch je priemerné
+        preťaženie v~prvých 10\,\% okien 138,1\,\textperthousand, v~stredných 80\,\% 90,2
+        a v~posledných 10\,\% 137,1\,\textperthousand.
+\end{itemize}
+
+\section{Rekonštrukcia prúdu paketov}
+\label{sec:rekonstrukcia}
+
+Dáta popisujú toky, RSS však pracuje s~paketmi. Každý smer toku sa preto rozvinie na pakety
+rozložené rovnomerne medzi začiatkom a koncom toku. Paket $k$ z~$N$ má čas
+\begin{equation}
+  t_k = t_\mathit{start} + (t_\mathit{end} - t_\mathit{start}) \cdot \frac{k}{N-1} .
+\end{equation}
+Pakety všetkých tokov sa spájajú podľa času pomocou minimovej haldy. Halda obsahuje iba
+živé toky, preto pamäť nerastie s~počtom paketov.
+
+\emph{Obmedzenie:} skutočné pakety rovnomerne rozložené nie sú, zhluky v~rámci toku
+simulácia nevidí.
+
+\section{Váha paketu}
+\label{sec:vahy}
+
+\begin{description}
+  \item[flow] každý smer toku je jedna jednotka; meria kvalitu hashu bez vplyvu veľkosti toku,
+  \item[packet] každý paket má váhu 1,
+  \item[byte] paket váži priemernú veľkosť paketu svojho toku.
+\end{description}
+
+\section{Metriky}
+\label{sec:metriky}
+
+Nech $x_i$ je záťaž kanála~$i$ v~okne, $n$ počet kanálov a $W=\sum_i x_i$ celková záťaž okna.
+
+\paragraph{Preťaženie} je podiel záťaže nad spravodlivým podielom, v~promile:
+\begin{equation}
+  O = \frac{\sum_{i} \max\left(0,\, x_i - W/n\right)}{W/1000} .
+\end{equation}
+Hodnota 0 znamená dokonale rovnomerné rozdelenie. Prakticky je to podiel prevádzky, ktorý by
+bolo treba presunúť z~preťažených kanálov, aby boli všetky rovnako zaťažené.
+
+\paragraph{Jainov index férovosti}~\TODO{citácia}
+\begin{equation}
+  J = \frac{\left(\sum_i x_i\right)^2}{n \sum_i x_i^2} , \qquad J \in \left[\tfrac{1}{n}, 1\right].
+\end{equation}
+
+\paragraph{Normalizované $\chi^2$}, kde $e = W/n$:
+\begin{equation}
+  \chi^2_\mathit{norm} = \frac{1}{W} \sum_i \frac{(x_i - e)^2}{e} .
+\end{equation}
+
+\section{Okná merania}
+\label{sec:okna}
+
+Záťaž sa vyhodnocuje v~nezávislých oknách s~pevným počtom paketov. Po každom okne sa
+počítadlá vynulujú a neúplné posledné okno sa zahodí. Výsledok jednej konfigurácie je priemer
+cez okná a cez 16 kľúčov. Okná sa porovnávali v~dvoch režimoch:
+
+\begin{description}
+  \item[pevné okno] 150\,000 paketov pre každý počet kanálov,
+  \item[dynamické okno] 18\,750 paketov na kanál, teda $18\,750 \cdot n$ paketov
+        (150\,000 pri 8 kanáloch, 2\,400\,000 pri 128).
+\end{description}
+
+Dôvod dynamického okna: pri pevnom okne pripadá pri 128 kanáloch na kanál iba približne
+1\,170 paketov. Dynamické okno drží rovnaký počet paketov na kanál.
+
+\paragraph{Zvažované a zamietnuté: výber časti tokov.}
+Väčšia linka nesie viac prevádzky, preto sme skúšali simulovať menší počet kanálov na
+pomernej časti tokov (8 kanálov = 1/16 tokov). Zamietli sme to, lebo by sa pri malom počte
+kanálov nepoužila väčšina dát a výsledok by závisel od toho, ktoré veľké toky sa do výberu
+dostanú.
+
+\emph{Obmedzenie dynamického okna:} všetky počty kanálov vidia rovnakú prevádzku, takže
+pri 128 kanáloch trvá okno 16-krát dlhšie a na kanál pripadá menej tokov.
+\TODO{Overiť na datasete s~vyššou prevádzkou, ak ho vedúci poskytne.}

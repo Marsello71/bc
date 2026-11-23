@@ -133,7 +133,3 @@ void Simulation::flowEnd(FlowToken flow) {
     jsqFlowEnd(jsq_, flow, &jsq_slots_[flow * channels_.size()]);   // take its rate back out
     free_flows_.push_back(flow);               // this slot can be reused by a new flow
 }
-
-//   Simulation::flowEnd      - jsqFlowEnd(...), give the flow number back
-//   Simulation::writeWindow  - metrics per key -> mean over keys -> one "hash" row per
-//                              channel count; one "jsq" row per channel count; zero everything

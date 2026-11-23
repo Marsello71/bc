@@ -1,5 +1,5 @@
 #!/bin/bash
-# Reference ("golden") results from the old code at commit 17b5145, on the small
+# Reference ("golden") results from the old code at commit 0aaa540, on the small
 # test dataset. Every refactor step must reproduce these numbers exactly.
 #
 # The old code is configured by #defines, so it is built once per combination
@@ -9,7 +9,7 @@
 # usage: bash tests/make_golden.sh        (run from the repository root)
 set -e
 
-REF_COMMIT=17b5145
+REF_COMMIT=0aaa540
 WINDOW=500
 REPO=$(pwd)
 DATA="$REPO/tests/data/flows_small.csv"
