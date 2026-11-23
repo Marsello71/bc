@@ -44,10 +44,12 @@ Settings loadSettings(const std::string &path) {
     s.tuple     = "full";
     s.symmetry  = "none";
     s.reta      = true;
+    s.scaling  = false;
     s.weighting = "packet";
     s.keys      = 16;
     s.channels  = {8, 16, 20, 32, 40, 64, 128};
     s.window    = 150000;
+    s.can_size = 18750;
 
     std::string text;
     int line = 0;
@@ -89,6 +91,9 @@ Settings loadSettings(const std::string &path) {
         } else if (key == "reta") {
             if (value != "on" && value != "off") fail(path, line, "reta must be on or off");
             s.reta = (value == "on");
+        } else if (key == "scaling") {
+            if (value != "on" && value != "off") fail(path, line, "scaling must be on or off");
+            s.scaling = (value == "on");
         } else if (key == "weighting") {
             if (value != "flow" && value != "packet" && value != "byte") fail(path, line, "weighting must be flow, packet or byte");
             s.weighting = value;
@@ -104,6 +109,8 @@ Settings loadSettings(const std::string &path) {
             }
         } else if (key == "window") {
             s.window = std::stol(value);
+        } else if (key == "can_size") {
+            s.can_size = std::stol(value);
         } else {
             fail(path, line, "unknown key '" + key + "'");
         }

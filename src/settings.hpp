@@ -20,10 +20,12 @@ struct Settings {
     std::string      tuple;       // "full" | "ip"
     std::string      symmetry;    // "none" | "xor" | "sort"
     bool             reta;        // "on" = true, "off" = false
+    bool             scaling;     // "on" = dynamic size of window
     std::string      weighting;   // "flow" | "packet" | "byte"
     int              keys;        // number of random keys
     std::vector<int> channels;    // DMA channel counts
     long             window;      // packets per window
+    long              can_size;   // number of packets per cannal
 };
 
 /// Read the config file. On any problem prints the reason and exits.

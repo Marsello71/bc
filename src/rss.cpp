@@ -152,7 +152,8 @@ void jsqInit(JsqState &j, const std::vector<int> &channels) {
 
 void jsqFlowStart(JsqState &j, FlowToken flow, const FlowInfo &info,
                   const std::vector<std::vector<int64_t>> &window_hist,
-                  int64_t packets_in_window, long window, uint8_t *out) {
+                  const std::vector<int64_t> &packets_in_window,
+                  const std::vector<long> &window_sizes, uint8_t *out) {
     if (flow >= j.flow_wrate.size()) {                // first time we see this flow number
         j.flow_wrate.resize(flow + 1);                // room for its load rate
         j.flow_prate.resize(flow + 1);                // room for its packet rate
@@ -166,11 +167,11 @@ void jsqFlowStart(JsqState &j, FlowToken flow, const FlowInfo &info,
         wrate = prate * static_cast<double>(info.weight);
     }
 
-    // how many seconds the rest of this window should take
-    const int64_t left = window - packets_in_window;  // packets missing in the window
-    const double t_left = j.packet_rate_total > 0.0 ? left / j.packet_rate_total : 0.0;
-
     for (std::size_t c = 0; c < j.rate_sum.size(); c++) {   // decide for every channel count
+        // how many seconds the rest of THIS channel count's window should take
+        const int64_t left = window_sizes[c] - packets_in_window[c];   // packets missing
+        const double t_left = j.packet_rate_total > 0.0 ? left / j.packet_rate_total : 0.0;
+
         std::size_t best = 0;                         // start with channel 0
         double best_load = window_hist[c][0] + t_left * j.rate_sum[c][0];
 

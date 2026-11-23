@@ -40,13 +40,12 @@ public:
     void      flowEnd(FlowToken flow);
 
 private:
-    void writeWindow();                  // one CSV row per (method, channel count), then zero the counters
+    void writeWindow(std::size_t c);                   // one CSV row per (method, channel count), then zero the counters
 
     // ---- settings ----
     RssConfig               cfg_;
     const std::vector<Key> &keys_;
     std::vector<int>        channels_;   // e.g. 8 16 20 32 40 64 128
-    long                    window_;     // packets per window
     std::ostream           &out_;
 
     // ---- per flow direction: the decisions made at flowStart ----
@@ -61,9 +60,10 @@ private:
     std::vector<std::vector<std::vector<int64_t>>> hash_hist_;   // [key][c][channel]
     std::vector<std::vector<int64_t>>              jsq_hist_;    // [c][channel]
     JsqState jsq_;
-    int64_t  packets_in_window_ = 0;
-    int64_t  window_weight_ = 0;         // sum of the weights, the metrics divide by it
-    long     window_index_ = 0;          // number of the last written window
+    std::vector<long>    window_sizes_;       // [c] packets per window
+    std::vector<int64_t> packets_in_window_;  // [c] packets since this window started
+    std::vector<int64_t> window_weight_;      // [c] total load, the metrics divide by it
+    std::vector<long>    window_index_;       // [c] number of the last written window
 };
 
 #endif // SIMULATION_HPP

@@ -11,7 +11,7 @@
 
 Simulation::Simulation(const Settings &s, const RssConfig &cfg,
                        const std::vector<Key> &keys, std::ostream &out)
-    : cfg_(cfg), keys_(keys), channels_(s.channels), window_(s.window), out_(out) {
+    : cfg_(cfg), keys_(keys), channels_(s.channels), out_(out) {
     const std::size_t NK = keys_.size();
     const std::size_t NC = channels_.size();
 
@@ -23,11 +23,17 @@ Simulation::Simulation(const Settings &s, const RssConfig &cfg,
         }
     }
 
+    window_sizes_.resize(NC);
     jsq_hist_.resize(NC);
     for(std::size_t c = 0; c < NC; c++) {
         jsq_hist_[c].assign(channels_[c], 0);
+        window_sizes_[c] = s.scaling ? s.can_size * channels_[c] : s.window;
     }
     jsqInit(jsq_, channels_);                  // JSQ starts with no live flows
+
+    packets_in_window_.assign(NC, 0);
+    window_weight_.assign(NC, 0);
+    window_index_.assign(NC, 0);
 
     out_ << "method,window,num_channels,overload,fairness,chi\n";
 }
@@ -50,7 +56,7 @@ FlowToken Simulation::flowStart(const Tuple &tuple, const FlowInfo &info) {
     rssChannels(tuple, cfg_, keys_, channels_, &hash_slots_[flow * PER_FLOW]);
 
     // JSQ picks its own channel from the current loads, one per channel count
-    jsqFlowStart(jsq_, flow, info, jsq_hist_, packets_in_window_, window_,
+    jsqFlowStart(jsq_, flow, info, jsq_hist_, packets_in_window_, window_sizes_,
                  &jsq_slots_[flow * channels_.size()]);
 
     return flow;                            // flow_expand passes this number back with every packet
@@ -74,57 +80,55 @@ void Simulation::packet(FlowToken flow, int64_t weight) {
         jsq_hist_[c][jsq_slot[c]] += weight;            // add the packet to that channel
     }
 
-    packets_in_window_++;                          // the window is measured in packets
-    window_weight_ += weight;                      // total load, the metrics divide by it
+    // ... existing loops: count the packet for all keys and for JSQ ...
 
-    if (packets_in_window_ == window_) {           // window full
-        writeWindow();                             // metrics -> CSV, reset the counters
+    for (std::size_t c = 0; c < NC; c++) {
+        packets_in_window_[c]++;                       // one more packet in this window
+        window_weight_[c] += weight;                   // and its load
+        if (packets_in_window_[c] == window_sizes_[c]) {   // this window is full
+            writeWindow(c);                            // write and reset only this c
+        }
     }
 }
 
-void Simulation::writeWindow() {
+void Simulation::writeWindow(std::size_t c) {
     const std::size_t NK = keys_.size();       // number of keys
-    const std::size_t NC = channels_.size();   // number of channel counts
 
-    window_index_++;                           // windows are numbered from 1
+    window_index_[c]++;
 
-    for (std::size_t c = 0; c < NC; c++) {
-        int n = channels_[c];                  // real channel count, e.g. 8
+    int n = channels_[c];                  // real channel count, e.g. 8
 
-        double overload = 0.0;                 // sums over all keys
-        double fairness = 0.0;
-        double chi = 0.0;
+    double overload = 0.0;                 // sums over all keys
+    double fairness = 0.0;
+    double chi = 0.0;
 
-        for (std::size_t k = 0; k < NK; k++) {
-            const std::vector<int64_t> &hist = hash_hist_[k][c];   // channel loads, no copy
-            overload += computeOverThreshold(hist, window_weight_, n);
-            fairness += computeFairness(hist, window_weight_, n);
-            chi      += computeChi(hist, window_weight_, n);
-        }
-        out_ << "hash,"                        // method
-            << window_index_ << ','           // window number
-            << n << ','                       // channel count
-            << overload / NK << ','           // mean over keys
-            << fairness / NK << ','
-            << chi / NK << '\n';
-
-        out_ << "jsq,"                         // JSQ has no keys, so no mean
-             << window_index_ << ','
-             << n << ','
-             << computeOverThreshold(jsq_hist_[c], window_weight_, n) << ','
-             << computeFairness(jsq_hist_[c], window_weight_, n) << ','
-             << computeChi(jsq_hist_[c], window_weight_, n) << '\n';
-    }
     for (std::size_t k = 0; k < NK; k++) {
-        for (std::size_t c = 0; c < NC; c++) {
-            std::fill(hash_hist_[k][c].begin(), hash_hist_[k][c].end(), 0);   // all channels to 0
-        }
+        const std::vector<int64_t> &hist = hash_hist_[k][c];   // channel loads, no copy
+        overload += computeOverThreshold(hist, window_weight_[c], n);
+        fairness += computeFairness(hist, window_weight_[c], n);
+        chi      += computeChi(hist, window_weight_[c], n);
     }
-    for (std::size_t c = 0; c < NC; c++) {
-        std::fill(jsq_hist_[c].begin(), jsq_hist_[c].end(), 0);   // JSQ loads to 0
+    out_ << "hash,"                        // method
+        << window_index_[c] << ','         // window number
+        << n << ','                        // channel count
+        << overload / NK << ','            // mean over keys
+        << fairness / NK << ','
+        << chi / NK << '\n';
+
+    out_ << "jsq,"                         // JSQ has no keys, so no mean
+            << window_index_[c] << ','
+            << n << ','
+            << computeOverThreshold(jsq_hist_[c], window_weight_[c], n) << ','
+            << computeFairness(jsq_hist_[c], window_weight_[c], n) << ','
+            << computeChi(jsq_hist_[c], window_weight_[c], n) << '\n';
+
+    for (std::size_t k = 0; k < NK; k++) {
+        std::fill(hash_hist_[k][c].begin(), hash_hist_[k][c].end(), 0);   // only this channel count
     }
-    packets_in_window_ = 0;                    // the next window starts empty
-    window_weight_ = 0;
+    std::fill(jsq_hist_[c].begin(), jsq_hist_[c].end(), 0);               // JSQ loads to 0
+
+    packets_in_window_[c] = 0;
+    window_weight_[c] = 0;
 }
 
 void Simulation::flowEnd(FlowToken flow) {

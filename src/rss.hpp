@@ -81,12 +81,13 @@ void jsqInit(JsqState &j, const std::vector<int> &channels);
 
 /// Pick a channel for a new flow at every channel count.
 ///   window_hist        weight already delivered in this window, [c][channel]
-///   packets_in_window  packets counted since the window started
-///   window             packets per window
+///   packets_in_window  packets counted since the window started, [c]
+///   window_sizes       packets per window, [c]
 ///   out                one channel per channel count
 void jsqFlowStart(JsqState &j, FlowToken flow, const FlowInfo &info,
                   const std::vector<std::vector<int64_t>> &window_hist,
-                  int64_t packets_in_window, long window, uint8_t *out);
+                  const std::vector<int64_t> &packets_in_window,
+                  const std::vector<long> &window_sizes, uint8_t *out);
 
 /// The flow ended: take its rate back out of the channels in `chosen`.
 void jsqFlowEnd(JsqState &j, FlowToken flow, const uint8_t *chosen);
